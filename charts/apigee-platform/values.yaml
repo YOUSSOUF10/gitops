@@ -1,0 +1,83 @@
+# charts/apigee-platform/values.yaml
+# Défaults — systématiquement overridés à partir de values/platform/*/values-*.yaml
+
+# ----------------------------------------------------------------------------
+# Sélecteur de rendu
+# ----------------------------------------------------------------------------
+# Contrôle quelle partie du chart est rendue. Positionné via --set depuis
+# les AppSet ArgoCD (parameters: render.only=...).
+# Valeurs : namespace | crds | controller | all (dev local)
+render:
+  only: all
+
+# ----------------------------------------------------------------------------
+# Namespace
+# ----------------------------------------------------------------------------
+namespace:
+  name: apigee
+  labels: {}
+  annotations: {}
+
+# ----------------------------------------------------------------------------
+# CRDs
+# ----------------------------------------------------------------------------
+crds:
+  enabled: []  # liste des CRDs à activer
+
+# ----------------------------------------------------------------------------
+# Apigee global
+# ----------------------------------------------------------------------------
+apigee:
+  hybridVersion: "1.14.0"
+  gcp:
+    projectID: ""
+    region: ""
+  organization:
+    name: ""
+
+# ----------------------------------------------------------------------------
+# Controller
+# ----------------------------------------------------------------------------
+controller:
+  image:
+    repository: ""
+    tag: ""
+  replicas: 1
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      memory: 1Gi
+  nodeSelector: {}
+  tolerations: []
+
+webhooks:
+  failurePolicy: Fail
+  timeoutSeconds: 30
+
+# ----------------------------------------------------------------------------
+# Telemetry
+# ----------------------------------------------------------------------------
+telemetry:
+  metrics:
+    enabled: true
+  logger:
+    enabled: true
+  udca:
+    enabled: true
+
+prometheus:
+  enabled: false
+
+# ----------------------------------------------------------------------------
+# Cluster context
+# ----------------------------------------------------------------------------
+cluster:
+  name: ""
+  region: ""
+
+# ----------------------------------------------------------------------------
+# Common labels
+# ----------------------------------------------------------------------------
+commonLabels: {}

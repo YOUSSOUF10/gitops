@@ -1,0 +1,13 @@
+# values/tenants/prod-finance/clusters/values-prod-finance-cluster-A.yaml
+# Surcharges prod-finance spécifiques au cluster-A.
+
+# Affinité pour tomber sur les nodes dédiés "apigee-runtime" de cluster-A
+apigee:
+  runtime:
+    nodeSelector:
+      workload: apigee-runtime
+    # tolerations: []  # si la plateforme taint ces nodes
+
+# En phase 2, quand prod-finance sera sur cluster-B aussi, on créera
+# un fichier similaire values-prod-finance-cluster-B.yaml avec les
+# nodeSelectors/tolerations propres à cluster-B.

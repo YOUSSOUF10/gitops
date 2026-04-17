@@ -1,0 +1,25 @@
+# values/platform/crds/values-common.yaml
+# Utilisé par l'AppSet 02 (CRDs only)
+#
+# Les CRDs sont rendues depuis le chart apigee-platform en `render.only: crds`.
+# La version Apigee Hybrid ciblée est verrouillée ici.
+
+apigee:
+  hybridVersion: "1.14.0"      # version Apigee Hybrid — à aligner avec le controller
+  # Source des CRDs : embarquées dans le chart (copiées depuis le tarball
+  # officiel apigee-hybrid-setup x.y.z, dossier charts/apigee-operator/crds/).
+  # Elles sont posées en ServerSideApply=true + Replace=true par l'AppSet.
+
+crds:
+  # Liste des CRDs à poser. Si Apigee en ajoute dans une release,
+  # ajouter le nom ici + le fichier dans charts/apigee-platform/crds/.
+  enabled:
+    - apigeeorganizations.apigee.cloud.google.com
+    - apigeeenvironments.apigee.cloud.google.com
+    - apigeeenvgroups.apigee.cloud.google.com
+    - apigeedeployments.apigee.cloud.google.com
+    - apigeeroutes.apigee.cloud.google.com
+    - apigeedatastores.apigee.cloud.google.com
+    - apigeeredis.apigee.cloud.google.com
+    - apigeetelemetries.apigee.cloud.google.com
+    - cassandradatareplications.apigee.cloud.google.com

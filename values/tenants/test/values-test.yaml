@@ -1,0 +1,17 @@
+# values/tenants/test/values-test.yaml
+
+apigee:
+  runtime:
+    resources:
+      requests:
+        cpu: 300m
+        memory: 768Mi
+
+resourceQuota:
+  enabled: false
+
+networkPolicies:
+  enabled: true
+  allowNamespaces:
+    - devtools
+    - qa-tools

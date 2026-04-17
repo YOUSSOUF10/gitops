@@ -1,0 +1,55 @@
+tenant: prod-finance
+apigeeEnv: prod-finance
+apigeeEnvGroup: prod-finance-group   # envgroup dédié
+appUID: ap43591
+platformEnv: prd
+
+# En phase 1 : prod-finance sur cluster-A uniquement.
+# En phase 2 : ajouter cluster-B pour HA (après Cassandra multi-DC UP).
+targetClusters:
+  - cluster-A
+  # - cluster-B
+
+ingressGateway:
+  mode: dedicated                         # gateway dédiée pour la prod
+  name: apigee-ingress-prod-finance
+  replicas: 2
+  svcType: ClusterIP                      # la Route OCP est gérée hors scope
+  # Le cert interne (pod-tls) vient de Vault via ExternalSecret
+  tlsSecretName: apigee-tls-prod-finance
+
+exposition:
+  ingressClass: traefik
+  hosts:
+    - host: api-finance.mondomaine.com
+      tlsSecretRef: ingress-tls           # cert externe plateforme
+    - host: api-finance-internal.mondomaine.com
+      tlsSecretRef: ingress-tls
+  targetServiceName: apigee-ingress-prod-finance
+  # ServersTransport Traefik : HTTPS end-to-end (exigé en prod)
+  serversTransport:
+    name: apigee-transport-prod-finance
+    serverName: apigee-ingress-prod-finance.apigee.svc
+    insecureSkipVerify: false
+    # Nom du Secret contenant le CA bundle (créé par ExternalSecret)
+    rootCAsSecret: apigee-ca-trust
+
+vault:
+  mountPath: secret/ap43591/apigee/prod-finance
+  gcpServiceAccounts:
+    synchronizer: sa-synchronizer.json
+    udca: sa-udca.json
+    mart: sa-mart.json
+    metrics: sa-metrics.json
+  tls:
+    internalCert: tls/internal
+    caBundle: ../ca/internal-ca
+
+runtime:
+  replicas: 3                             # prod : 3 replicas minimum
+synchronizer:
+  replicas: 2
+
+cassandraReplication:
+  dc-1: 3
+  # Phase 2 : ajouter dc-2: 3 après que le DC2 soit UN (nodetool status)

@@ -1,0 +1,58 @@
+# AppSet 01 — Namespace Apigee
+#
+# Rôle : créer UNIQUEMENT le namespace Apigee sur chaque cluster cible.
+# Aucune autre ressource — c'est la contrainte de la policy Kyverno.
+#
+# Le namespace porte :
+#   - le label `appUID` (obligatoire pour Kyverno + External Secrets)
+#   - le label `apigee.cloud.google.com/platform=apigee`
+
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: apigee-ns-appset
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+
+  generators:
+    # Au démarrage : un seul cluster. Pour ajouter cluster-B,
+    # décommenter la ligne correspondante (voir docs/extending-to-two-clusters.md).
+    - list:
+        elements:
+          - cluster: cluster-A
+          # - cluster: cluster-B
+
+  template:
+    metadata:
+      name: 'apigee-ns-{{.cluster}}'
+      annotations:
+        argocd.argoproj.io/sync-wave: "0"
+    spec:
+      project: default
+      destination:
+        name: '{{.cluster}}'
+        namespace: apigee
+      sources:
+        - repoURL: https://gitlab.group.echonet/<appUID>/apigee-gitops.git
+          targetRevision: HEAD
+          path: charts/apigee-platform
+          helm:
+            releaseName: apigee-ns
+            ignoreMissingValueFiles: true
+            valueFiles:
+              - $values/values/platform/namespace/values-common.yaml
+            # On ne render QUE le template namespace.yaml
+            parameters:
+              - name: render.only
+                value: namespace
+        - repoURL: https://gitlab.group.echonet/<appUID>/apigee-gitops.git
+          targetRevision: HEAD
+          ref: values
+      syncPolicy:
+        automated:
+          prune: false       # JAMAIS prune le namespace — trop destructeur
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true

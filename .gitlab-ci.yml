@@ -1,0 +1,178 @@
+# .gitlab-ci.yml — pipeline de validation du repo GitOps Apigee
+#
+# Stages :
+#   1. lint       : helm lint sur les 3 charts locaux
+#   2. validate   : helm template + kubeconform (vérif schémas K8s + CRDs Apigee)
+#   3. argocd     : test de rendu ArgoCD (dry-run, optionnel)
+
+stages:
+  - lint
+  - validate
+  - argocd
+
+variables:
+  HELM_VERSION: "3.14.0"
+  KUBECONFORM_VERSION: "0.6.4"
+
+# ---------------------------------------------------------------------------
+# Image de base avec helm + kubeconform + yq
+# ---------------------------------------------------------------------------
+.tools-image: &tools-image
+  image: alpine/helm:${HELM_VERSION}
+  before_script:
+    - apk add --no-cache curl bash yq
+    - curl -sL https://github.com/yannh/kubeconform/releases/download/v${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz
+        | tar xz -C /usr/local/bin kubeconform
+
+# ===========================================================================
+# STAGE 1 — LINT
+# ===========================================================================
+
+lint:charts:
+  <<: *tools-image
+  stage: lint
+  script:
+    - echo "=== helm lint apigee-platform ==="
+    - helm lint charts/apigee-platform
+        --values values/platform/controller/values-common.yaml
+        --values values/platform/crds/values-common.yaml
+    - echo "=== helm lint apigee-cassandra ==="
+    - helm lint charts/apigee-cassandra
+        --values values/platform/cassandra/values-common.yaml
+        --values values/platform/cassandra/values-topology.yaml
+        --values values/platform/cassandra/values-dc1.yaml
+    - echo "=== helm lint apigee-tenant (par tenant) ==="
+    - |
+      for gen in argo/generators/tenants/*.yaml; do
+        tenant=$(yq '.tenant' "$gen")
+        safe_tenant=${tenant#_}  # enlève le préfixe _ pour les tenants infra
+        echo "--- tenant: $tenant ---"
+        tenant_values="values/tenants/${tenant}/values-${tenant}.yaml"
+        if [ ! -f "$tenant_values" ]; then
+          tenant_values="values/tenants/${tenant}/values-${safe_tenant}.yaml"
+        fi
+        helm lint charts/apigee-tenant \
+          --values values/tenants/values-common.yaml \
+          --values "$tenant_values" \
+          --set tenant.name=$tenant \
+          --set tenant.cluster=cluster-A \
+          --set tenant.appUID=ap43591
+      done
+
+lint:yaml:
+  image: cytopia/yamllint:latest
+  stage: lint
+  script:
+    - |
+      cat > /tmp/yamllint.conf << 'EOC'
+      extends: default
+      rules:
+        line-length: disable
+        document-start: disable
+        indentation:
+          indent-sequences: consistent
+      EOC
+    - yamllint -c /tmp/yamllint.conf argo/ values/ docs/ || true
+  allow_failure: true   # informatif, pas bloquant
+
+# ===========================================================================
+# STAGE 2 — VALIDATE
+# ===========================================================================
+
+validate:platform:
+  <<: *tools-image
+  stage: validate
+  script:
+    - mkdir -p /tmp/rendered
+    - for render_only in namespace crds controller; do
+        echo "=== platform render.only=${render_only} ===";
+        helm template apigee-platform charts/apigee-platform
+          --values values/platform/controller/values-common.yaml
+          --values values/platform/crds/values-common.yaml
+          --values values/platform/telemetry/values-common.yaml
+          --set render.only=${render_only}
+          --set cluster.name=cluster-A
+          --set cluster.region=europe-west1
+          > /tmp/rendered/platform-${render_only}.yaml;
+      done
+    # Validation K8s natifs — ignore les CRDs Apigee (pas de schéma public)
+    - kubeconform
+        -schema-location default
+        -skip ApigeeOrganization,ApigeeDatastore,ApigeeEnvironment,ApigeeEnvGroup,ApigeeTelemetry,ApigeeIngressGateway,ApigeeRoute,CassandraDataReplication,ServersTransport
+        -strict -summary
+        /tmp/rendered/platform-*.yaml
+  artifacts:
+    paths:
+      - /tmp/rendered/
+    expire_in: 1 day
+    when: always
+
+validate:cassandra:
+  <<: *tools-image
+  stage: validate
+  script:
+    - mkdir -p /tmp/rendered
+    - helm template apigee-cassandra charts/apigee-cassandra
+        --values values/platform/cassandra/values-common.yaml
+        --values values/platform/cassandra/values-topology.yaml
+        --values values/platform/cassandra/values-dc1.yaml
+        > /tmp/rendered/cassandra.yaml
+    - kubeconform -schema-location default -skip ApigeeDatastore,CassandraDataReplication
+        -strict -summary /tmp/rendered/cassandra.yaml
+  artifacts:
+    paths:
+      - /tmp/rendered/
+    expire_in: 1 day
+
+validate:tenants:
+  <<: *tools-image
+  stage: validate
+  script:
+    - mkdir -p /tmp/rendered
+    - |
+      for gen in argo/generators/tenants/*.yaml; do
+        tenant=$(yq '.tenant' "$gen")
+        safe_tenant=${tenant#_}
+        tenant_values="values/tenants/${tenant}/values-${tenant}.yaml"
+        [ -f "$tenant_values" ] || tenant_values="values/tenants/${tenant}/values-${safe_tenant}.yaml"
+        targetClusters=$(yq '.targetClusters[]' "$gen")
+        for cluster in $targetClusters; do
+          for render_only in externalsecrets ingressgateway apigee-env exposure; do
+            echo "=== $tenant on $cluster render.only=$render_only ===";
+            cluster_values="values/tenants/${tenant}/clusters/values-${tenant}-${cluster}.yaml"
+            extra_values=""
+            [ -f "$cluster_values" ] && extra_values="--values $cluster_values"
+            helm template "${render_only}-${tenant}" charts/apigee-tenant \
+              --values values/tenants/values-common.yaml \
+              --values "$tenant_values" \
+              $extra_values \
+              --set render.only=$render_only \
+              --set tenant.name=$tenant \
+              --set tenant.cluster=$cluster \
+              --set tenant.appUID=ap43591 \
+              > "/tmp/rendered/tenant-${tenant}-${cluster}-${render_only}.yaml"
+          done
+        done
+      done
+    - kubeconform -schema-location default
+        -skip ApigeeEnvironment,ApigeeEnvGroup,ApigeeIngressGateway,ExternalSecret,ServersTransport
+        -strict -summary /tmp/rendered/tenant-*.yaml
+  artifacts:
+    paths:
+      - /tmp/rendered/
+    expire_in: 1 day
+
+# ===========================================================================
+# STAGE 3 — ARGOCD (optionnel, demande l'image argocd-cli)
+# ===========================================================================
+# Valide que le kustomization.yaml racine et les AppSets sont parseables
+# par ArgoCD.
+
+argocd:kustomize-check:
+  image: alpine/k8s:1.28.5
+  stage: argocd
+  script:
+    - kubectl kustomize argo/manifests/ > /tmp/argo-rendered.yaml
+    - grep -c "kind: ApplicationSet" /tmp/argo-rendered.yaml
+    # Doit afficher 7 (nombre d'AppSets dans kustomization.yaml + 1 App Cassandra)
+  allow_failure: true

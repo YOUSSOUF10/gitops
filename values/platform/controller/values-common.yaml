@@ -1,0 +1,36 @@
+# values/platform/controller/values-common.yaml
+# Utilisé par l'AppSet 03 (controller + telemetry)
+
+apigee:
+  hybridVersion: "1.14.0"      # DOIT correspondre à values/platform/crds/values-common.yaml
+  gcp:
+    projectID: "my-gcp-apigee-project"
+    region: "europe-west1"     # région Apigee Control Plane (pas K8s)
+  # L'org Apigee — correspond à un ApigeeOrganization CR.
+  organization:
+    name: "my-apigee-org"
+
+controller:
+  image:
+    # Le chart Apigee officiel fige les tags, on override ici si besoin
+    # de retirer un tag en cas de CVE.
+    repository: "gcr.io/apigee-release/hybrid/apigee-controller"
+    # tag: laissé vide = celui du chart (recommandé)
+  replicas: 1                   # le controller est un singleton (leader election)
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      memory: 1Gi
+
+# Webhooks — important pour que kube-apiserver joigne le controller
+webhooks:
+  failurePolicy: Fail           # Fail = strict, safer en prod
+  timeoutSeconds: 30
+
+# Labels standards appliqués à toutes les ressources créées
+commonLabels:
+  appUID: ap43591
+  app.kubernetes.io/part-of: apigee-hybrid
+  app.kubernetes.io/managed-by: argocd

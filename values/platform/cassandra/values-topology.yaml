@@ -1,0 +1,92 @@
+# ============================================================================
+# values/platform/cassandra/values-topology.yaml
+# ============================================================================
+#
+# ⚠️  FICHIER CRITIQUE — pilote la topologie Cassandra.
+#
+# Toute modification ici a un impact direct sur les données et la disponibilité.
+# Une MR modifiant ce fichier doit être revue par au moins 2 personnes dont un
+# opérateur Apigee/Cassandra.
+#
+# ----------------------------------------------------------------------------
+# PHASE 1 — mono-DC (état initial, sur cluster-A uniquement)
+# ----------------------------------------------------------------------------
+# - 1 seul datacenter Cassandra : "dc-1"
+# - 3 pods dans ce DC, répartis sur 3 nodes différents (podAntiAffinity)
+# - RF des keyspaces Apigee = 3 (RF = replicaCount en mono-DC)
+# - Quorum local = 2 (tolère la perte d'1 node)
+#
+# ----------------------------------------------------------------------------
+# PHASE 2 — multi-DC (extension à cluster-B pour upgrade Apigee / HA)
+# ----------------------------------------------------------------------------
+# Étapes à suivre dans CET ORDRE (voir docs/cassandra-phase2.md) :
+#
+# 1. [PLATEFORME]  Créer un Service cross-cluster pour les seeds
+#                  (DNS resolvable des deux côtés : cassandra-seed.apigee.internal)
+# 2. [GIT, MR #1]  Mettre `multiRegion.enabled: true` ci-dessous
+#                  + ajouter le bloc `dc-2` dans `datacenters:`
+#                  + laisser `keyspacesReplication` inchangé pour l'instant
+#                  → Merger → ArgoCD crée les 3 pods DC2 (vides)
+# 3. [MANUEL]      Exec dans un pod du DC2 :
+#                  `nodetool rebuild -- dc-1`
+#                  Attendre que `nodetool status` montre 6 nodes UN
+# 4. [GIT, MR #2]  Passer `keyspacesReplication` à `{dc-1: 3, dc-2: 3}`
+#                  → Merger → le controller Apigee augmente la réplication
+# 5. [MANUEL]      `nodetool repair -full` sur un pod de chaque DC
+#
+# JAMAIS sauter les étapes manuelles (3 et 5) : sans elles, le DC2 est vide
+# et les requêtes Apigee qui tombent dessus échouent.
+# ============================================================================
+
+cassandra:
+  # --------------------------------------------------------------------------
+  # COMMUTATEUR DE PHASE
+  # --------------------------------------------------------------------------
+  # false en phase 1, true en phase 2.
+  multiRegion:
+    enabled: false
+
+    # Utilisés UNIQUEMENT si enabled: true
+    # Le seed host doit être resolvable depuis LES DEUX clusters.
+    seedHost: ""
+    # Exemple phase 2 :
+    # seedHost: "cassandra-seed.apigee.internal"
+
+  # --------------------------------------------------------------------------
+  # DATACENTERS
+  # --------------------------------------------------------------------------
+  # En phase 1 : un seul entry (dc-1).
+  # En phase 2 : décommenter le bloc dc-2.
+  datacenters:
+    - name: dc-1
+      cluster: cluster-A
+      replicaCount: 3
+      # 1 pod par node physique (anti-affinité stricte)
+      podAntiAffinity:
+        type: required
+      rack:
+        name: ra-1           # rack unique — Apigee Hybrid ne gère qu'un rack/DC
+
+    # PHASE 2 — décommenter quand prêt :
+    # - name: dc-2
+    #   cluster: cluster-B
+    #   replicaCount: 3
+    #   podAntiAffinity:
+    #     type: required
+    #   rack:
+    #     name: ra-1
+
+  # --------------------------------------------------------------------------
+  # REPLICATION DES KEYSPACES APIGEE
+  # --------------------------------------------------------------------------
+  # Apigee crée 8 keyspaces. Ce bloc pilote leur replication factor PAR DC.
+  # Le controller Apigee applique la config à chaque réconciliation.
+  #
+  # PHASE 1 :
+  keyspacesReplication:
+    dc-1: 3
+
+  # PHASE 2 (après étape 3 ci-dessus validée) :
+  # keyspacesReplication:
+  #   dc-1: 3
+  #   dc-2: 3

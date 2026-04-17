@@ -1,0 +1,12 @@
+# values/platform/controller/clusters/values-cluster-A.yaml
+# Surcharges spécifiques au cluster-A (region, nodeSelector, tolerations…)
+
+cluster:
+  name: cluster-A
+  region: europe-west1         # région K8s (à ne pas confondre avec région GCP Apigee)
+
+controller:
+  # Si cluster-A a un pool de nodes dédié "apigee-controller", on le cible.
+  nodeSelector:
+    workload: apigee-system
+  # tolerations: []             # à compléter si la plateforme taint ses nodes

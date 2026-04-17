@@ -1,0 +1,20 @@
+# values/platform/telemetry/values-common.yaml
+# Utilisé par l'AppSet 03 (inclus avec controller)
+
+telemetry:
+  # Apigee Hybrid envoie logs + metrics vers GCP par défaut.
+  # On peut ajouter des exports custom (Prometheus local, Datadog…) si besoin.
+  metrics:
+    enabled: true
+    # Le SA GCP "apigee-metrics" est monté via ExternalSecret par tenant.
+    # Le controller consomme celui du tenant courant.
+  logger:
+    enabled: true
+  # UDCA (analytics) — consomme sa-udca
+  udca:
+    enabled: true
+
+# Si l'équipe ops veut scraper en local avec leur Prometheus :
+prometheus:
+  enabled: false
+  # serviceMonitor créé si true — nécessite Prometheus Operator côté plateforme

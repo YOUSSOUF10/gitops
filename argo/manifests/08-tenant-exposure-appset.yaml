@@ -1,0 +1,81 @@
+# AppSet 08 — Tenant exposure (Traefik)
+#
+# Rôle : poser l'Ingress Traefik + le ServersTransport qui exposent
+#        l'IngressGateway Apigee au monde extérieur via la plateforme.
+#
+# Convention plateforme (vu dans les schémas Traefik HTTPS-HTTPS) :
+#   - Ingress référence l'IngressClass "traefik"
+#   - Pour la PROD : HTTPS end-to-end → ServersTransport pointe vers
+#                    la CA interne qui a signé le cert du pod Apigee
+#   - Le cert externe (Traefik → client) est géré par cert-manager plateforme
+#     et injecté via le secret "ingress-tls" dans le namespace traefik
+#
+# Dernier dans l'ordre (wave 35) car c'est ce qui rend le tenant joignable
+# depuis l'extérieur.
+
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: apigee-tenant-exposure-appset
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+
+  generators:
+    - matrix:
+        generators:
+          - git:
+              repoURL: https://gitlab.group.echonet/<appUID>/apigee-gitops.git
+              revision: HEAD
+              files:
+                - path: argo/generators/tenants/*.yaml
+          - list:
+              elements:
+                - cluster: cluster-A
+                # - cluster: cluster-B
+
+        selector:
+          matchExpressions:
+            - key: cluster
+              operator: In
+              values: ["{{`{{ .targetClusters | toJson }}`}}"]
+
+  template:
+    metadata:
+      name: 'apigee-exposure-{{.tenant}}-{{.cluster}}'
+      annotations:
+        argocd.argoproj.io/sync-wave: "35"
+    spec:
+      project: default
+      destination:
+        name: '{{.cluster}}'
+        namespace: apigee
+      sources:
+        - repoURL: https://gitlab.group.echonet/<appUID>/apigee-gitops.git
+          targetRevision: HEAD
+          path: charts/apigee-tenant
+          helm:
+            releaseName: 'exposure-{{.tenant}}'
+            ignoreMissingValueFiles: true
+            valueFiles:
+              - $values/values/tenants/values-common.yaml
+              - $values/values/tenants/{{.tenant}}/values-{{.tenant}}.yaml
+              - $values/values/tenants/{{.tenant}}/clusters/values-{{.tenant}}-{{.cluster}}.yaml
+            parameters:
+              - name: render.only
+                value: exposure
+              - name: tenant.name
+                value: '{{.tenant}}'
+              - name: tenant.cluster
+                value: '{{.cluster}}'
+              - name: tenant.appUID
+                value: '{{.appUID}}'
+        - repoURL: https://gitlab.group.echonet/<appUID>/apigee-gitops.git
+          targetRevision: HEAD
+          ref: values
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - ServerSideApply=true

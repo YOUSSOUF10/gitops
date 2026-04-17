@@ -1,0 +1,11 @@
+# values/platform/namespace/values-common.yaml
+# Utilisé par l'AppSet 01 (namespace only)
+
+namespace:
+  name: apigee
+  labels:
+    appUID: ap43591
+    apigee.cloud.google.com/platform: apigee
+    app.kubernetes.io/part-of: apigee-hybrid
+  annotations:
+    external-secrets.io/allow: "true"

@@ -1,0 +1,48 @@
+{{/*
+========================================================================
+ApigeeIngressGateway
+========================================================================
+Rendu avec render.only ∈ {ingressgateway, all}.
+Généré UNIQUEMENT si ingressGateway.mode == dedicated.
+
+En mode "shared", le tenant ne pose rien ici — c'est le tenant `_infra-*`
+qui a déjà posé la gateway mutualisée, et l'ApigeeEnvGroup la référencera
+directement.
+
+Pré-requis : Secret TLS `ingressGateway.tlsSecretName` présent (matérialisé
+par l'ExternalSecret de la wave 25).
+*/}}
+{{- if eq (include "apigee-tenant.render" (dict "want" "ingressgateway" "root" .)) "true" }}
+{{- if eq (include "apigee-tenant.isDedicatedGateway" .) "true" }}
+apiVersion: apigee.cloud.google.com/v1alpha1
+kind: ApigeeIngressGateway
+metadata:
+  name: {{ .Values.ingressGateway.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "apigee-tenant.labels" . | nindent 4 }}
+spec:
+  replicaCountMin: {{ .Values.ingressGateway.replicas }}
+  replicaCountMax: {{ mul .Values.ingressGateway.replicas 2 }}
+
+  # Service exposé par la gateway
+  service:
+    type: {{ .Values.ingressGateway.svcType }}
+    {{- if .Values.ingressGateway.svcAnnotations }}
+    annotations:
+      {{- toYaml .Values.ingressGateway.svcAnnotations | nindent 6 }}
+    {{- end }}
+
+  # Cert TLS de la gateway (Apigee termine le HTTPS interne ici)
+  # Le Secret est créé par l'ExternalSecret de la wave 25.
+  tls:
+    credentialName: {{ .Values.ingressGateway.tlsSecretName | quote }}
+
+  resources:
+    requests:
+      cpu: {{ .Values.ingressGateway.resources.requests.cpu | quote }}
+      memory: {{ .Values.ingressGateway.resources.requests.memory | quote }}
+    limits:
+      memory: {{ .Values.ingressGateway.resources.limits.memory | quote }}
+{{- end }}
+{{- end }}

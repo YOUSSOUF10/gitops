@@ -1,0 +1,53 @@
+# Generator pour le tenant "dev"
+#
+# Lu par les ApplicationSet matrix pour fabriquer les Applications
+# concrètes (secrets, ingress, env, exposure) pour ce tenant.
+
+tenant: dev
+apigeeEnv: dev                 # nom de l'ApigeeEnvironment (CR Apigee)
+apigeeEnvGroup: nonprod-group  # EnvGroup partagé entre dev et test
+appUID: ap43591
+platformEnv: hprd              # convention plateforme (hprd = hors prod)
+
+# Liste des clusters sur lesquels ce tenant est déployé.
+# En phase 1 : cluster-A uniquement. En phase 2 : ajouter cluster-B si HA souhaitée.
+targetClusters:
+  - cluster-A
+
+# ----- Ingress Gateway -----
+ingressGateway:
+  mode: shared                              # dev partage la gateway nonprod
+  sharedGatewayName: apigee-ingress-nonprod # posée par _infra-nonprod
+
+# ----- Exposition (Traefik) -----
+exposition:
+  ingressClass: traefik
+  hosts:
+    - host: api-dev.mondomaine.com
+      tlsSecretRef: ingress-tls             # géré par cert-manager plateforme
+  # Contrat avec l'équipe réseau : la Route OCP n'est pas dans notre scope,
+  # elle doit pointer vers le Service ClusterIP ci-dessous.
+  targetServiceName: apigee-ingress-nonprod-svc
+
+# ----- Vault / ExternalSecrets -----
+vault:
+  mountPath: secret/ap43591/apigee/dev
+  gcpServiceAccounts:
+    synchronizer: sa-synchronizer.json
+    udca: sa-udca.json
+    mart: sa-mart.json
+    metrics: sa-metrics.json
+  tls:
+    internalCert: tls/internal               # cert Apigee (pod-tls)
+    caBundle: ../ca/internal-ca              # CA interne (pour ServersTransport)
+
+# ----- Dimensionnement -----
+runtime:
+  replicas: 1                    # env non-prod, 1 replica suffit
+synchronizer:
+  replicas: 1
+
+# ----- Cassandra replication -----
+# En phase 1 : {dc-1: 3}. Jamais modifié au niveau tenant en phase 1.
+cassandraReplication:
+  dc-1: 3

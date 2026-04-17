@@ -1,0 +1,76 @@
+# AppSet 06 — Tenant ApigeeIngressGateway
+#
+# Rôle : poser l'IngressGateway Apigee pour les tenants en mode "dedicated".
+#        Les tenants en mode "shared" ne posent RIEN ici : ils réutilisent
+#        la gateway d'un tenant "infra" (_infra-nonprod, _infra-prod).
+#
+# Le chart filtre au rendu en fonction de `ingressGateway.mode`.
+#
+# Pré-requis : ExternalSecrets en place (wave 25), notamment le cert TLS interne.
+
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: apigee-tenant-ingress-appset
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+
+  generators:
+    - matrix:
+        generators:
+          - git:
+              repoURL: https://gitlab.group.echonet/<appUID>/apigee-gitops.git
+              revision: HEAD
+              files:
+                - path: argo/generators/tenants/*.yaml
+          - list:
+              elements:
+                - cluster: cluster-A
+                # - cluster: cluster-B
+
+        selector:
+          matchExpressions:
+            - key: cluster
+              operator: In
+              values: ["{{`{{ .targetClusters | toJson }}`}}"]
+
+  template:
+    metadata:
+      name: 'apigee-ingress-{{.tenant}}-{{.cluster}}'
+      annotations:
+        argocd.argoproj.io/sync-wave: "28"
+    spec:
+      project: default
+      destination:
+        name: '{{.cluster}}'
+        namespace: apigee
+      sources:
+        - repoURL: https://gitlab.group.echonet/<appUID>/apigee-gitops.git
+          targetRevision: HEAD
+          path: charts/apigee-tenant
+          helm:
+            releaseName: 'ingress-{{.tenant}}'
+            ignoreMissingValueFiles: true
+            valueFiles:
+              - $values/values/tenants/values-common.yaml
+              - $values/values/tenants/{{.tenant}}/values-{{.tenant}}.yaml
+              - $values/values/tenants/{{.tenant}}/clusters/values-{{.tenant}}-{{.cluster}}.yaml
+            parameters:
+              - name: render.only
+                value: ingressgateway
+              - name: tenant.name
+                value: '{{.tenant}}'
+              - name: tenant.cluster
+                value: '{{.cluster}}'
+              - name: tenant.appUID
+                value: '{{.appUID}}'
+        - repoURL: https://gitlab.group.echonet/<appUID>/apigee-gitops.git
+          targetRevision: HEAD
+          ref: values
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - ServerSideApply=true

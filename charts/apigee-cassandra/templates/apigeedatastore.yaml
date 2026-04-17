@@ -1,0 +1,99 @@
+{{/*
+ApigeeDatastore — le CR Apigee qui décrit la topologie Cassandra.
+
+Le controller Apigee lit ce CR et en déduit :
+  - Le StatefulSet Cassandra (nombre de replicas par DC)
+  - Les Services headless nécessaires
+  - La configuration cassandra.yaml (seeds, DC, rack)
+
+Ce template est GoTemplate-driven par values-topology.yaml.
+*/}}
+apiVersion: apigee.cloud.google.com/v1alpha1
+kind: ApigeeDatastore
+metadata:
+  name: default
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "apigee-cassandra.labels" . | nindent 4 }}
+spec:
+  # ---------------------------------------------------------------------
+  # Config générale Cassandra
+  # ---------------------------------------------------------------------
+  components:
+    cassandra:
+      properties:
+        # Identifiant de "cluster Cassandra" (pas cluster K8s !) — fixe
+        clusterName: apigee-cassandra-default
+
+        # Multi-region (phase 2 only)
+        {{- if .Values.cassandra.multiRegion.enabled }}
+        multiRegionSeedHost: {{ .Values.cassandra.multiRegion.seedHost | quote }}
+        {{- end }}
+
+        # JVM
+        dcName: {{ (index .Values.cassandra.datacenters 0).name | quote }}
+
+      image:
+        url: {{ .Values.cassandra.image.repository | quote }}
+        {{- if .Values.cassandra.image.tag }}
+        tag: {{ .Values.cassandra.image.tag | quote }}
+        {{- end }}
+
+      # Ressources appliquées à chaque pod Cassandra
+      resources:
+        requests:
+          cpu: {{ .Values.cassandra.resources.requests.cpu | quote }}
+          memory: {{ .Values.cassandra.resources.requests.memory | quote }}
+        limits:
+          memory: {{ .Values.cassandra.resources.limits.memory | quote }}
+
+      # JVM heap
+      maxHeapSize: {{ .Values.cassandra.maxHeapSize | quote }}
+      heapNewSize: {{ .Values.cassandra.heapNewSize | quote }}
+
+      # Authentification
+      auth:
+        secretRef: {{ .Values.cassandra.auth.secretRef | quote }}
+
+      # TLS intra-cluster et client
+      {{- if or .Values.cassandra.tls.internodeEncryption .Values.cassandra.tls.clientEncryption }}
+      tls:
+        internodeEncryption: {{ .Values.cassandra.tls.internodeEncryption | quote }}
+        clientEncryption: {{ .Values.cassandra.tls.clientEncryption }}
+        secretRef: {{ .Values.cassandra.tls.secretRef | quote }}
+      {{- end }}
+
+      # Storage — un PVC par pod
+      storage:
+        storageClass: {{ .Values.storage.storageClass | quote }}
+        capacity: {{ .Values.storage.size | quote }}
+
+      # ---------------------------------------------------------------------
+      # DATACENTERS
+      # ---------------------------------------------------------------------
+      # En phase 1 : un seul entry (dc-1 sur cluster-A).
+      # En phase 2 : deux entries (dc-1 et dc-2).
+      datacenters:
+      {{- range .Values.cassandra.datacenters }}
+        - name: {{ .name | quote }}
+          replicaCount: {{ .replicaCount }}
+          {{- if .rack }}
+          rack: {{ .rack.name | quote }}
+          {{- end }}
+          {{- if .podAntiAffinity }}
+          podAntiAffinity:
+            type: {{ .podAntiAffinity.type | quote }}
+          {{- end }}
+      {{- end }}
+
+      # ---------------------------------------------------------------------
+      # REPLICATION DES KEYSPACES
+      # ---------------------------------------------------------------------
+      # Appliqué par le controller Apigee. Changer ce bloc déclenche
+      # ALTER KEYSPACE sur tous les keyspaces Apigee.
+      {{- if .Values.cassandra.keyspacesReplication }}
+      keyspacesReplication:
+        {{- range $dc, $rf := .Values.cassandra.keyspacesReplication }}
+        {{ $dc }}: {{ $rf }}
+        {{- end }}
+      {{- end }}

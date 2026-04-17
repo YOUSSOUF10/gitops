@@ -1,0 +1,25 @@
+apiVersion: v2
+name: apigee-tenant
+description: |
+  Chart pour la COUCHE 2 Apigee Hybrid — tout ce qui est par tenant.
+
+  Un même chart rend 4 sous-ensembles selon `render.only` :
+    - externalsecrets : SA GCP, cert TLS, CA bundle  (AppSet 05, wave 25)
+    - ingressgateway  : ApigeeIngressGateway         (AppSet 06, wave 28)
+    - apigee-env      : ApigeeEnvironment + EnvGroup (AppSet 07, wave 30)
+    - exposure        : Ingress Traefik + ServersTransport
+                        + NetworkPolicies + Quotas    (AppSet 08, wave 35)
+
+  Supporte deux modes d'IngressGateway :
+    - dedicated : le tenant POSE sa gateway
+    - shared    : le tenant RÉFÉRENCE la gateway d'un tenant `_infra-*`
+
+  Supporte un type `infra` spécial pour les tenants techniques qui ne
+  portent qu'une IngressGateway mutualisée (pas d'ApigeeEnvironment).
+type: application
+version: 0.1.0
+appVersion: "1.14.0"
+
+maintainers:
+  - name: Équipe Apigee
+    email: apigee-team@example.com

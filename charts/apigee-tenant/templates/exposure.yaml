@@ -1,0 +1,94 @@
+{{/*
+========================================================================
+Exposition Traefik — Ingress + ServersTransport
+========================================================================
+Rendu avec render.only ∈ {exposure, all}.
+
+DEUX objets générés par tenant, conformes au schéma plateforme
+"HTTPS ingress with HTTPS backend" :
+
+1. Ingress (networking.k8s.io/v1)
+   Dit à Traefik : "le host X est routé vers le Service Y".
+   Référence :
+     - externalTLSSecret (cert public, géré par cert-manager plateforme)
+     - ServersTransport (via annotation) pour HTTPS end-to-end vers Apigee
+
+2. ServersTransport (CRD Traefik)
+   Dit à Traefik : "quand tu forward en HTTPS vers Apigee, valide le cert
+   avec cette CA, attends ce serverName".
+
+Pour un tenant "shared" (dev, test), on AJOUTE une rule dans l'Ingress
+du tenant infra — pas d'Ingress séparé. Mais pour garder la simplicité
+de l'AppSet matrix, chaque tenant génère son propre Ingress qui pointe
+vers le MÊME Service `apigee-ingress-nonprod`. Traefik merge les rules
+par IngressClass — c'est propre.
+
+Les tenants infra POSENT leur Ingress comme les autres (c'est eux qui
+portent le Service de la gateway).
+*/}}
+{{- if eq (include "apigee-tenant.render" (dict "want" "exposure" "root" .)) "true" }}
+{{- $safe := include "apigee-tenant.safeName" . }}
+{{- $tenant := .Values.tenant.name }}
+{{- $targetSvc := .Values.exposition.targetServiceName }}
+{{- $transportName := .Values.exposition.serversTransport.name }}
+
+{{- /* ---- 1. Ingress ---- */ -}}
+{{- if .Values.exposition.hosts }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: apigee-ingress-{{ $safe }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "apigee-tenant.labels" . | nindent 4 }}
+  annotations:
+    # Instruction Traefik : utiliser notre ServersTransport pour le backend HTTPS
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    {{- if $transportName }}
+    traefik.ingress.kubernetes.io/service.serverstransport: "{{ .Release.Namespace }}-{{ $transportName }}@kubernetescrd"
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.platform.ingressClass }}
+
+  # TLS externe (plateforme) — Traefik termine le HTTPS client ici
+  tls:
+    {{- range .Values.exposition.hosts }}
+    - hosts:
+        - {{ .host | quote }}
+      secretName: {{ .tlsSecretRef | default $.Values.platform.externalTLSSecret }}
+    {{- end }}
+
+  rules:
+    {{- range .Values.exposition.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $targetSvc }}
+                port:
+                  number: 443
+    {{- end }}
+{{- end }}
+
+{{- /* ---- 2. ServersTransport (CRD Traefik) ---- */ -}}
+{{- if and $transportName .Values.exposition.serversTransport.serverName }}
+---
+apiVersion: traefik.io/v1alpha1
+kind: ServersTransport
+metadata:
+  name: {{ $transportName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "apigee-tenant.labels" . | nindent 4 }}
+spec:
+  serverName: {{ .Values.exposition.serversTransport.serverName | quote }}
+  insecureSkipVerify: {{ .Values.exposition.serversTransport.insecureSkipVerify }}
+  {{- if .Values.exposition.serversTransport.rootCAsSecret }}
+  rootCAsSecrets:
+    - {{ .Values.exposition.serversTransport.rootCAsSecret }}
+  {{- end }}
+{{- end }}
+{{- end }}

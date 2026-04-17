@@ -1,0 +1,23 @@
+# values/tenants/dev/values-dev.yaml
+# Surcharges spécifiques au tenant "dev".
+
+apigee:
+  runtime:
+    # Dev : 1 replica suffit, on réduit les ressources
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        memory: 1Gi
+
+# Quotas et limites propres au tenant
+resourceQuota:
+  enabled: false    # en dev, pas de quota strict
+
+# NetworkPolicies (le chart les génère si enabled: true)
+networkPolicies:
+  enabled: true
+  # Autorise les workloads du namespace `devtools` à appeler l'API dev
+  allowNamespaces:
+    - devtools

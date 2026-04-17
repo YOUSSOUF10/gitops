@@ -1,0 +1,22 @@
+apiVersion: v2
+name: apigee-platform
+description: |
+  Chart wrapper pour la COUCHE 1 Apigee Hybrid :
+  - Namespace apigee (avec labels Kyverno/appUID)
+  - CRDs Apigee
+  - Controller Apigee + telemetry
+
+  Un même chart rend plusieurs sous-ensembles selon `render.only` :
+    - namespace   : le namespace uniquement (AppSet 01)
+    - crds        : les CRDs uniquement (AppSet 02)
+    - controller  : controller + telemetry (AppSet 03)
+
+  Cette séparation permet à ArgoCD de poser les ressources par vagues
+  (sync-waves) avec des syncOptions différentes par type.
+type: application
+version: 0.1.0
+appVersion: "1.14.0"
+
+maintainers:
+  - name: Équipe Apigee
+    email: apigee-team@example.com

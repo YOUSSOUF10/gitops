@@ -1,0 +1,23 @@
+# values/tenants/_infra-nonprod/values-_infra-nonprod.yaml
+# Surcharges du tenant technique "_infra-nonprod".
+
+# Ressources de la gateway mutualisée — supporte les 2 tenants nonprod (dev+test)
+ingressGateway:
+  resources:
+    requests:
+      cpu: 300m
+      memory: 512Mi
+    limits:
+      memory: 1Gi
+
+# Pas de ressources Apigee env/runtime pour ce tenant technique
+# (le chart skip ces blocs si type: infra)
+
+networkPolicies:
+  enabled: true
+  allowNamespaces:
+    - traefik
+
+# Pas de quotas pour le tenant infra (il porte une ressource partagée)
+resourceQuota:
+  enabled: false

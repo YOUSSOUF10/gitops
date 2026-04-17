@@ -1,0 +1,110 @@
+{{/*
+========================================================================
+NetworkPolicies + ResourceQuota + PDB
+========================================================================
+Rendu avec render.only ∈ {exposure, all} — ce sont des ressources
+"autour" du tenant qui se posent en dernier (wave 35).
+
+Pour la NetworkPolicy : on contrôle qui peut parler au Service du tenant.
+Le namespace apigee étant partagé par TOUS les tenants, les NP sont
+taggées par labels tenant pour ne s'appliquer qu'aux bons pods.
+
+⚠️  Attention : si on pose des NetworkPolicies trop strictes dans le
+namespace apigee, on peut casser la communication inter-composants
+Apigee (cassandra ↔ runtime ↔ synchronizer). C'est pour ça qu'on les
+laisse `enabled: false` par défaut et qu'on les active tenant par tenant
+avec un allowlist explicite.
+*/}}
+{{- if eq (include "apigee-tenant.render" (dict "want" "exposure" "root" .)) "true" }}
+{{- $safe := include "apigee-tenant.safeName" . }}
+
+{{- /* ---- NetworkPolicy ---- */ -}}
+{{- if .Values.networkPolicies.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: apigee-{{ $safe }}-allow-ingress
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "apigee-tenant.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      apigee.cloud.google.com/tenant: {{ .Values.tenant.name | quote }}
+  policyTypes:
+    - Ingress
+  ingress:
+    # Autorise Traefik à joindre les pods du tenant
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.platform.traefikNamespace }}
+    # + les namespaces explicitement listés dans values du tenant
+    {{- range .Values.networkPolicies.allowNamespaces }}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ . }}
+    {{- end }}
+{{- end }}
+
+{{- /* ---- ResourceQuota ---- */ -}}
+{{- if .Values.resourceQuota.enabled }}
+{{- /*
+⚠️  Le ResourceQuota s'applique au NAMESPACE entier. Comme tous les
+tenants partagent le namespace apigee, on NE peut PAS avoir un
+ResourceQuota par tenant via cette méthode.
+
+Deux options possibles :
+  a) ResourceQuota global pour le namespace apigee (pas par tenant)
+  b) Utiliser un namespace par tenant (mais Apigee Hybrid recommande
+     un namespace unique)
+
+On part sur l'option (a) : on pose UN SEUL ResourceQuota quand c'est
+le tenant `_infra-*` qui le définit, ou on skip silencieusement pour
+les autres. Sinon ça créerait un conflit (plusieurs ResourceQuota dans
+le même namespace = somme des limites les plus strictes).
+
+Ici, on génère un ResourceQuota SI et SEULEMENT SI le tenant est de
+type infra (donc il parle au nom de tout le namespace).
+Pour les tenants standards, un message d'info à l'opérateur.
+*/ -}}
+{{- if eq (include "apigee-tenant.isInfra" .) "true" }}
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: apigee-quota
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "apigee-tenant.labels" . | nindent 4 }}
+spec:
+  hard:
+    {{- toYaml .Values.resourceQuota.hard | nindent 4 }}
+{{- else }}
+# Note : ResourceQuota ignoré pour tenant non-infra ({{ .Values.tenant.name }})
+# — voir templates/exposure-extras.yaml pour l'explication.
+{{- end }}
+{{- end }}
+
+{{- /* ---- PodDisruptionBudget ---- */ -}}
+{{- if .Values.pdb.enabled }}
+{{- if ne (include "apigee-tenant.isInfra" .) "true" }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: apigee-{{ $safe }}-runtime-pdb
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "apigee-tenant.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      apigee.cloud.google.com/tenant: {{ .Values.tenant.name | quote }}
+      app: apigee-runtime
+{{- end }}
+{{- end }}
+
+{{- end }}

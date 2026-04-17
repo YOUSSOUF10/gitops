@@ -1,0 +1,54 @@
+# Tenant TECHNIQUE — ne correspond pas à un env Apigee réel.
+#
+# Rôle : poser l'ApigeeIngressGateway MUTUALISÉE pour les tenants non-prod
+#        (dev, test, etc. qui sont en `mode: shared`).
+#
+# Le préfixe `_` n'a pas de sens pour ArgoCD, c'est juste une convention
+# de nommage pour distinguer visuellement les tenants techniques.
+
+tenant: _infra-nonprod
+apigeeEnv: ""                             # pas d'ApigeeEnvironment créé ici
+apigeeEnvGroup: ""
+appUID: ap43591
+platformEnv: hprd
+
+# L'infra nonprod est sur cluster-A en phase 1.
+# Phase 2 : ajouter cluster-B si on veut une gateway nonprod par cluster.
+targetClusters:
+  - cluster-A
+
+# Ce tenant technique crée UNIQUEMENT une IngressGateway, rien d'autre.
+# Le chart détecte `tenant.type: infra` et skip les ExternalSecrets GCP,
+# l'ApigeeEnvironment, etc.
+type: infra
+
+ingressGateway:
+  mode: dedicated                         # c'est le tenant qui la POSE
+  name: apigee-ingress-nonprod
+  replicas: 2
+  svcType: ClusterIP
+  tlsSecretName: apigee-tls-nonprod
+
+# Cert interne Apigee pour la gateway mutualisée — partagé par dev/test
+vault:
+  mountPath: secret/ap43591/apigee/_infra/nonprod
+  tls:
+    internalCert: tls/internal
+    caBundle: ../ca/internal-ca
+
+# Exposition Traefik de la gateway mutualisée
+# Les tenants dev/test NE créent PAS leur Ingress : ils ajoutent leur host
+# comme rule supplémentaire à cet Ingress mutualisé (voir chart apigee-tenant,
+# template exposure.yaml, bloc `if eq .mode "shared"`).
+exposition:
+  ingressClass: traefik
+  # Host fallback pour tester la gateway directement
+  hosts:
+    - host: apigee-nonprod.mondomaine.com
+      tlsSecretRef: ingress-tls
+  targetServiceName: apigee-ingress-nonprod
+  serversTransport:
+    name: apigee-transport-nonprod
+    serverName: apigee-ingress-nonprod.apigee.svc
+    insecureSkipVerify: false
+    rootCAsSecret: apigee-ca-trust

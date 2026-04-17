@@ -1,0 +1,34 @@
+# Cette Application est le point d'entrée de tout le déploiement Apigee.
+#
+# Elle est créée MANUELLEMENT la toute première fois via l'UI ArgoCD :
+#   - Nom attendu dans l'UI : argocd-<id>-apps/apigee-root-app
+#     (le préfixe namespace/ est imposé par le setup "App in any namespace"
+#      de la plateforme — il n'apparaît PAS dans ce fichier stocké en Git)
+#   - Repo    : <url du repo>
+#   - Path    : argo/manifests
+#   - Target  : la branche env courante (hprd, prd…)
+#
+# Une fois créée, elle se résout depuis Git et n'est plus modifiée via l'UI.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: apigee-root-app
+  # Le namespace est injecté par l'instance ArgoCD (argocd-<id>-apps).
+  # On ne le met PAS ici, il vient du contexte de création.
+spec:
+  project: default  # à remplacer par un AppProject dédié si votre plateforme l'exige
+  source:
+    repoURL: https://gitlab.group.echonet/<appUID>/apigee-gitops.git
+    targetRevision: HEAD
+    path: argo/manifests
+  destination:
+    name: in-cluster   # la root App tourne sur l'instance ArgoCD elle-même
+    namespace: argocd  # remplacé par argocd-<id>-apps dans votre setup
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ApplyOutOfSyncOnly=true

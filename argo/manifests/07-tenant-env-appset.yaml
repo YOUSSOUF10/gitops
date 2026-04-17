@@ -1,0 +1,79 @@
+# AppSet 07 — Tenant ApigeeEnvironment + ApigeeEnvGroup
+#
+# Rôle : créer les CR Apigee qui définissent l'env logique du tenant
+#        et le groupe d'env qui porte le virtualhost.
+#
+# C'est ICI que le runtime Apigee se matérialise :
+#   - pods apigee-runtime
+#   - pods apigee-synchronizer (consomme le SA GCP)
+#   - pods apigee-udca
+#
+# Pré-requis : Cassandra UN (wave 15), Secrets en place (wave 25),
+#              IngressGateway prête (wave 28).
+
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: apigee-tenant-env-appset
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+
+  generators:
+    - matrix:
+        generators:
+          - git:
+              repoURL: https://gitlab.group.echonet/<appUID>/apigee-gitops.git
+              revision: HEAD
+              files:
+                - path: argo/generators/tenants/*.yaml
+          - list:
+              elements:
+                - cluster: cluster-A
+                # - cluster: cluster-B
+
+        selector:
+          matchExpressions:
+            - key: cluster
+              operator: In
+              values: ["{{`{{ .targetClusters | toJson }}`}}"]
+
+  template:
+    metadata:
+      name: 'apigee-env-{{.tenant}}-{{.cluster}}'
+      annotations:
+        argocd.argoproj.io/sync-wave: "30"
+    spec:
+      project: default
+      destination:
+        name: '{{.cluster}}'
+        namespace: apigee
+      sources:
+        - repoURL: https://gitlab.group.echonet/<appUID>/apigee-gitops.git
+          targetRevision: HEAD
+          path: charts/apigee-tenant
+          helm:
+            releaseName: 'env-{{.tenant}}'
+            ignoreMissingValueFiles: true
+            valueFiles:
+              - $values/values/tenants/values-common.yaml
+              - $values/values/tenants/{{.tenant}}/values-{{.tenant}}.yaml
+              - $values/values/tenants/{{.tenant}}/clusters/values-{{.tenant}}-{{.cluster}}.yaml
+            parameters:
+              - name: render.only
+                value: apigee-env
+              - name: tenant.name
+                value: '{{.tenant}}'
+              - name: tenant.cluster
+                value: '{{.cluster}}'
+              - name: tenant.appUID
+                value: '{{.appUID}}'
+        - repoURL: https://gitlab.group.echonet/<appUID>/apigee-gitops.git
+          targetRevision: HEAD
+          ref: values
+      syncPolicy:
+        automated:
+          prune: false    # Un ApigeeEnvironment supprimé NE nettoie PAS Cassandra !
+          selfHeal: true  # Voir docs/tenant-removal.md
+        syncOptions:
+          - ServerSideApply=true

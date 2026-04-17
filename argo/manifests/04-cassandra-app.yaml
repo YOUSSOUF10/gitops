@@ -1,0 +1,63 @@
+# Application 04 — Cassandra
+#
+# POURQUOI UNE APP ET PAS UN APPSET ?
+#   Cassandra est l'élément le plus sensible. Sa topologie évolue dans le
+#   temps (phase 1 mono-DC cluster-A → phase 2 multi-DC cluster-A + cluster-B).
+#   On pilote ça par le FICHIER values-topology.yaml, pas par un matrix
+#   generator qui créerait des replicas asymétriques impossibles à gérer.
+#
+# PHASE 1 (état actuel) :
+#   - 1 seul DC : "dc-1" sur cluster-A
+#   - 3 pods Cassandra, 1 par node (podAntiAffinity)
+#   - RF (replication factor) des keyspaces Apigee = {dc-1: 3}
+#   - Quorum local (LOCAL_QUORUM) = 2
+#
+# PHASE 2 (à venir) :
+#   - Ajouter le DC2 sur cluster-B (modifier values-topology.yaml)
+#   - Lancer `nodetool rebuild -- dc-1` depuis un pod DC2 (RUNBOOK)
+#   - Vérifier `nodetool status` : 6 nodes UN
+#   - Augmenter le RF des keyspaces : {dc-1: 3, dc-2: 3}
+#   Voir docs/cassandra-phase2.md
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: apigee-cassandra
+  annotations:
+    argocd.argoproj.io/sync-wave: "15"
+spec:
+  project: default
+  destination:
+    # PHASE 1 : destination unique = cluster-A
+    # PHASE 2 : cette App reste sur cluster-A, une seconde App sera créée pour cluster-B
+    #           (plus simple à piloter qu'un generator, car les values diffèrent par DC).
+    name: cluster-A
+    namespace: apigee
+  sources:
+    - repoURL: https://gitlab.group.echonet/<appUID>/apigee-gitops.git
+      targetRevision: HEAD
+      path: charts/apigee-cassandra
+      helm:
+        releaseName: apigee-cassandra
+        ignoreMissingValueFiles: true
+        valueFiles:
+          - $values/values/platform/cassandra/values-common.yaml
+          - $values/values/platform/cassandra/values-topology.yaml
+          - $values/values/platform/cassandra/values-dc1.yaml
+    - repoURL: https://gitlab.group.echonet/<appUID>/apigee-gitops.git
+      targetRevision: HEAD
+      ref: values
+  syncPolicy:
+    automated:
+      prune: false          # JAMAIS prune — ça supprimerait les StatefulSets et les PVCs !
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
+  # Le controller Apigee mute certains champs du StatefulSet Cassandra.
+  ignoreDifferences:
+    - group: apps
+      kind: StatefulSet
+      jsonPointers:
+        - /spec/replicas
+        - /spec/template/spec/containers/0/resources
