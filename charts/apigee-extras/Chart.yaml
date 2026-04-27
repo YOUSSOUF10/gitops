@@ -1,0 +1,10 @@
+apiVersion: v2
+name: apigee-extras
+description: |
+  Ressources NON couvertes par les charts officiels Google.
+  Génère par tenant : ExternalSecrets, Ingress Traefik, ServersTransport,
+  NetworkPolicies, PodDisruptionBudgets.
+  Seul chart LOCAL du dépôt — rendu par les AppSets 05 (secrets) et 08 (exposure).
+type: application
+version: 0.1.0
+appVersion: "1.16.0"

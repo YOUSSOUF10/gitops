@@ -1,0 +1,47 @@
+# values/platform/datastore/values-topology.yaml
+# ============================================================================
+# ⚠️  FICHIER CRITIQUE — pilote la topologie Cassandra.
+# Mêmes règles que dans la v1 — voir docs/cassandra-phase2.md
+# ============================================================================
+#
+# PHASE 1 (état initial) : mono-DC
+# PHASE 2 (extension)    : multi-DC via décomment
+# ============================================================================
+
+cassandra:
+  # --------------------------------------------------------------------------
+  # MULTI-REGION (multi-DC cross-cluster)
+  # --------------------------------------------------------------------------
+  multiRegion:
+    enabled: false
+    # Phase 2 : décommenter
+    # enabled: true
+
+  # Seed host pour le multi-DC — resolvable cross-cluster
+  # Phase 2 : décommenter
+  # multiRegionSeedHost: "cassandra-seed.apigee.internal"
+
+  # --------------------------------------------------------------------------
+  # DATACENTER(S)
+  # --------------------------------------------------------------------------
+  # Le chart Google "apigee-datastore" utilise `datacenter` (singulier)
+  # pour le DC courant dans lequel ce chart est déployé.
+  # On NE définit PAS le DC distant ici — chaque cluster a sa propre
+  # instance du chart avec son propre `datacenter`.
+  datacenter: "dc-1"
+
+  # Rack (le chart Google 1.16 attend un string, pas un objet)
+  rack: "ra-1"
+
+  # --------------------------------------------------------------------------
+  # REPLICATION
+  # --------------------------------------------------------------------------
+  # Replication factor des keyspaces Apigee.
+  # Le format Google utilise un entier pour mono-DC :
+  replicationFactor: 3
+
+  # Phase 2 : passer en mode multi-DC avec un format map :
+  # databaseStorage:
+  #   multiRegionPolicyReplication:
+  #     dc-1: 3
+  #     dc-2: 3

@@ -1,0 +1,8 @@
+# values/platform/operator/clusters/values-cluster-A.yaml
+
+instanceID: "cluster-a-apigee"
+
+ao:
+  nodeSelector:
+    workload: apigee-system
+  # tolerations: []

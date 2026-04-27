@@ -1,0 +1,43 @@
+# values/platform/operator/values-common.yaml
+# ============================================================================
+# Format attendu par le chart Google "apigee-operator" (version 1.16.x)
+# ============================================================================
+# Pour connaître TOUS les paramètres disponibles :
+#   helm show values oci://icr.io/<appUID>/helm-charts/apigee-operator --version 1.16.0
+# ============================================================================
+
+# Namespace cible (doit matcher la destination de l'AppSet)
+namespace: apigee
+
+# Projet et org GCP
+gcp:
+  projectID: "my-gcp-apigee-project"
+  region: "europe-west1"
+
+org: "my-apigee-org"
+
+# Identifiant unique de cette installation sur ce cluster.
+# Doit être UNIQUE PAR CLUSTER.
+instanceID: "cluster-a-apigee"
+
+# ---- Operator (controller) ----
+ao:
+  image:
+    url: "gcr.io/apigee-release/hybrid/apigee-operators"
+    # tag: laissé vide = le chart utilise la version par défaut (alignée 1.16.x)
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      memory: 1Gi
+
+# ---- RBAC ----
+# Le chart Google crée ses propres ServiceAccount, ClusterRole, etc.
+# Pas besoin de surcharger en général.
+
+# ---- Labels additionnels sur toutes les ressources ----
+additionalLabels:
+  appUID: ap43591
+  app.kubernetes.io/part-of: apigee-hybrid
+  app.kubernetes.io/managed-by: argocd

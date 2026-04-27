@@ -1,0 +1,33 @@
+# values/tenants/_infra-nonprod/values-_infra-nonprod-extras.yaml
+tenant:
+  type: infra
+
+vault:
+  mountPath: secret/ap43591/apigee/_infra/nonprod
+  tls:
+    internalCert: tls/internal
+    caBundle: ../ca/internal-ca
+
+ingressGateway:
+  mode: dedicated
+  tlsSecretName: apigee-tls-infra-nonprod
+
+exposition:
+  ingressClass: traefik
+  hosts:
+    - host: apigee-nonprod.mondomaine.com
+      tlsSecretRef: ingress-tls
+  targetServiceName: apigee-ingress-nonprod
+  serversTransport:
+    name: apigee-transport-nonprod
+    serverName: apigee-ingress-nonprod.apigee.svc
+    insecureSkipVerify: false
+    rootCAsSecret: apigee-ca-trust
+
+networkPolicies:
+  enabled: true
+  allowNamespaces:
+    - traefik
+
+pdb:
+  enabled: false

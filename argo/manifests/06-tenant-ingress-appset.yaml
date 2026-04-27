@@ -1,12 +1,16 @@
-# AppSet 06 — Tenant ApigeeIngressGateway
+# AppSet 06 — Tenant IngressGateway
 #
-# Rôle : poser l'IngressGateway Apigee pour les tenants en mode "dedicated".
-#        Les tenants en mode "shared" ne posent RIEN ici : ils réutilisent
-#        la gateway d'un tenant "infra" (_infra-nonprod, _infra-prod).
+# Consomme le chart OFFICIEL Google "apigee-ingress-manager".
+# Le chart Google gère l'ApigeeIngressGateway + les composants réseau internes.
 #
-# Le chart filtre au rendu en fonction de `ingressGateway.mode`.
+# Toujours conditionné par `ingressGateway.mode` dans le generator :
+#   - dedicated : le chart est rendu → gateway posée
+#   - shared    : le chart n'est PAS rendu → le tenant réutilise un gateway existant
 #
-# Pré-requis : ExternalSecrets en place (wave 25), notamment le cert TLS interne.
+# Le mode shared est géré par un generator selector dans les AppSets
+# (filtré par `ingressGateway.mode` == "dedicated" dans le template condition).
+# En pratique, les tenants "shared" ne matchent pas le selector ci-dessous,
+# donc ArgoCD ne génère PAS d'Application pour eux.
 
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
@@ -29,12 +33,6 @@ spec:
                 - cluster: cluster-A
                 # - cluster: cluster-B
 
-        selector:
-          matchExpressions:
-            - key: cluster
-              operator: In
-              values: ["{{`{{ .targetClusters | toJson }}`}}"]
-
   template:
     metadata:
       name: 'apigee-ingress-{{.tenant}}-{{.cluster}}'
@@ -46,25 +44,17 @@ spec:
         name: '{{.cluster}}'
         namespace: apigee
       sources:
-        - repoURL: https://gitlab.group.echonet/<appUID>/apigee-gitops.git
-          targetRevision: HEAD
-          path: charts/apigee-tenant
+        # Chart Google apigee-ingress-manager
+        - repoURL: oci://icr.io/<appUID>/helm-charts
+          chart: apigee-ingress-manager
+          targetRevision: 1.16.0
           helm:
             releaseName: 'ingress-{{.tenant}}'
             ignoreMissingValueFiles: true
             valueFiles:
-              - $values/values/tenants/values-common.yaml
-              - $values/values/tenants/{{.tenant}}/values-{{.tenant}}.yaml
-              - $values/values/tenants/{{.tenant}}/clusters/values-{{.tenant}}-{{.cluster}}.yaml
-            parameters:
-              - name: render.only
-                value: ingressgateway
-              - name: tenant.name
-                value: '{{.tenant}}'
-              - name: tenant.cluster
-                value: '{{.cluster}}'
-              - name: tenant.appUID
-                value: '{{.appUID}}'
+              - $values/values/platform/ingressmanager/values-common.yaml
+              - $values/values/tenants/{{.tenant}}/values-{{.tenant}}-ingress.yaml
+        # Values
         - repoURL: https://gitlab.group.echonet/<appUID>/apigee-gitops.git
           targetRevision: HEAD
           ref: values

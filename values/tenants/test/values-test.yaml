@@ -1,17 +1,24 @@
-# values/tenants/test/values-test.yaml
+# values/tenants/test/values-test.yaml — format chart Google "apigee-env"
+namespace: apigee
+envName: "test"
+org: "my-apigee-org"
 
-apigee:
-  runtime:
-    resources:
-      requests:
-        cpu: 300m
-        memory: 768Mi
+runtime:
+  replicaCountMin: 2
+  replicaCountMax: 3
+  resources:
+    requests:
+      cpu: 300m
+      memory: 768Mi
+    limits:
+      memory: 1536Mi
 
-resourceQuota:
-  enabled: false
+synchronizer:
+  replicaCountMin: 1
+  replicaCountMax: 2
+  serviceAccountRef: apigee-synchronizer-svc-account-test
 
-networkPolicies:
-  enabled: true
-  allowNamespaces:
-    - devtools
-    - qa-tools
+udca:
+  replicaCountMin: 1
+  replicaCountMax: 1
+  serviceAccountRef: apigee-udca-svc-account-test

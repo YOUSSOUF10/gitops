@@ -1,0 +1,62 @@
+# AppSet 03 — Apigee Organization + Telemetry
+#
+# Deux charts Google consommés via multi-sources ArgoCD :
+#   - apigee-org        → pose ApigeeOrganization (le CR racine)
+#   - apigee-telemetry  → pose ApigeeTelemetry (logs/metrics GCP)
+#
+# Pré-requis : operator installé (wave 5), CRDs en place.
+
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: apigee-org-appset
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+
+  generators:
+    - list:
+        elements:
+          - cluster: cluster-A
+          # - cluster: cluster-B
+
+  template:
+    metadata:
+      name: 'apigee-org-{{.cluster}}'
+      annotations:
+        argocd.argoproj.io/sync-wave: "10"
+    spec:
+      project: default
+      destination:
+        name: '{{.cluster}}'
+        namespace: apigee
+      sources:
+        # Chart 1 : ApigeeOrganization
+        - repoURL: oci://icr.io/<appUID>/helm-charts
+          chart: apigee-org
+          targetRevision: 1.16.0
+          helm:
+            releaseName: apigee-org
+            ignoreMissingValueFiles: true
+            valueFiles:
+              - $values/values/platform/org/values-common.yaml
+              - $values/values/platform/org/clusters/values-{{.cluster}}.yaml
+        # Chart 2 : Telemetry (même App, même destination)
+        - repoURL: oci://icr.io/<appUID>/helm-charts
+          chart: apigee-telemetry
+          targetRevision: 1.16.0
+          helm:
+            releaseName: apigee-telemetry
+            ignoreMissingValueFiles: true
+            valueFiles:
+              - $values/values/platform/telemetry/values-common.yaml
+        # Source values
+        - repoURL: https://gitlab.group.echonet/<appUID>/apigee-gitops.git
+          targetRevision: HEAD
+          ref: values
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - ServerSideApply=true

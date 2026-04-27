@@ -1,0 +1,17 @@
+# values/tenants/_infra-nonprod/values-infra-nonprod-ingress.yaml
+# Format chart Google "apigee-ingress-manager"
+# Ce tenant technique pose la gateway mutualisée pour dev/test.
+namespace: apigee
+
+ingressGateway:
+  name: apigee-ingress-nonprod
+  replicaCountMin: 2
+  replicaCountMax: 3
+  svcType: ClusterIP
+  sslSecret: apigee-tls-infra-nonprod
+  resources:
+    requests:
+      cpu: 300m
+      memory: 512Mi
+    limits:
+      memory: 1Gi

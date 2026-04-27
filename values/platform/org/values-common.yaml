@@ -1,0 +1,43 @@
+# values/platform/org/values-common.yaml
+# ============================================================================
+# Format attendu par le chart Google "apigee-org" (version 1.16.x)
+# ============================================================================
+# Ce chart crée la CR ApigeeOrganization et les composants associés
+# (MART, Watcher, etc.)
+# ============================================================================
+
+namespace: apigee
+
+org: "my-apigee-org"
+gcp:
+  projectID: "my-gcp-apigee-project"
+  region: "europe-west1"
+
+# ---- MART (Management API for Runtime Tables) ----
+mart:
+  image:
+    url: "gcr.io/apigee-release/hybrid/apigee-mart-server"
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+  replicaCountMin: 1
+  replicaCountMax: 2
+  # Secret contenant le SA GCP MART (matérialisé par ExternalSecret)
+  serviceAccountRef: apigee-mart-svc-account-org
+
+# ---- Watcher ----
+watcher:
+  image:
+    url: "gcr.io/apigee-release/hybrid/apigee-watcher"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+# ---- Connect Agent (optionnel, pour relier au control plane Apigee) ----
+connectAgent:
+  enabled: true
+  serviceAccountRef: apigee-connect-agent-svc-account-org

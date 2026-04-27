@@ -1,0 +1,40 @@
+# values/tenants/env-common/values-env-common.yaml
+# ============================================================================
+# Paramètres PARTAGÉS par tous les tenants, pour le chart Google "apigee-env".
+# Surchargés par tenant via values/<tenant>/values-<tenant>.yaml
+# ============================================================================
+
+namespace: apigee
+
+org: "my-apigee-org"
+
+# ---- Runtime ----
+runtime:
+  image:
+    url: "gcr.io/apigee-release/hybrid/apigee-runtime"
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      memory: 2Gi
+
+# ---- Synchronizer ----
+synchronizer:
+  image:
+    url: "gcr.io/apigee-release/hybrid/apigee-synchronizer"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+# ---- UDCA ----
+udca:
+  image:
+    url: "gcr.io/apigee-release/hybrid/apigee-udca"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi

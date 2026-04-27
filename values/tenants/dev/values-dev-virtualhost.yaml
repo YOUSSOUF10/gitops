@@ -1,0 +1,19 @@
+# values/tenants/dev/values-dev-virtualhost.yaml — format "apigee-virtualhost"
+namespace: apigee
+org: "my-apigee-org"
+envgroup: "nonprod-group"
+
+virtualhosts:
+  - name: api-dev
+    hostnames:
+      - "api-dev.mondomaine.com"
+    sslSecret: apigee-tls-infra-nonprod
+
+routingRules:
+  - envs:
+      - "dev"
+    hosts:
+      - "api-dev.mondomaine.com"
+
+ingressGateways:
+  - name: apigee-ingress-nonprod

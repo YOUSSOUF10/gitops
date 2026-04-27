@@ -1,39 +1,40 @@
 # values/tenants/prod-finance/values-prod-finance.yaml
-# Spécifiques au tenant "prod-finance" (valable pour tous les clusters cibles).
-# Les surcharges par cluster vont dans clusters/values-prod-finance-<cluster>.yaml.
+# ============================================================================
+# Surcharges du chart Google "apigee-env" pour le tenant prod-finance
+# ============================================================================
 
-apigee:
-  runtime:
-    # Prod : minimum 3 replicas, PodDisruptionBudget actif
-    resources:
-      requests:
-        cpu: 1
-        memory: 2Gi
-      limits:
-        memory: 4Gi
-  synchronizer:
-    resources:
-      requests:
-        cpu: 200m
-        memory: 512Mi
+namespace: apigee
 
-# PodDisruptionBudget pour garantir la continuité pendant les upgrades
-pdb:
-  enabled: true
-  minAvailable: 2
+# Le nom de l'env Apigee (doit correspondre à l'env créé côté control plane)
+envName: "prod-finance"
+org: "my-apigee-org"
 
-# Quotas obligatoires en prod
-resourceQuota:
-  enabled: true
-  hard:
-    requests.cpu: "20"
-    requests.memory: 40Gi
-    limits.memory: 80Gi
+# ---- Runtime ----
+runtime:
+  replicaCountMin: 3
+  replicaCountMax: 6
+  resources:
+    requests:
+      cpu: 1
+      memory: 2Gi
+    limits:
+      memory: 4Gi
+  nodeSelector:
+    workload: apigee-runtime
 
-# NetworkPolicies strictes en prod
-networkPolicies:
-  enabled: true
-  # Liste explicite des sources autorisées
-  allowNamespaces:
-    - traefik         # ingress qui route vers nous
-  # Egress GCP déjà autorisé par la plateforme via ServiceEntry Istio
+# ---- Synchronizer ----
+synchronizer:
+  replicaCountMin: 2
+  replicaCountMax: 4
+  # Secret contenant le SA GCP synchronizer (créé par ExternalSecret)
+  serviceAccountRef: apigee-synchronizer-svc-account-prod-finance
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+
+# ---- UDCA ----
+udca:
+  replicaCountMin: 1
+  replicaCountMax: 2
+  serviceAccountRef: apigee-udca-svc-account-prod-finance

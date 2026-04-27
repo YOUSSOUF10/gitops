@@ -1,0 +1,24 @@
+# values/tenants/extras-common.yaml
+# Paramètres partagés pour le chart LOCAL apigee-extras
+# (ExternalSecrets + Ingress Traefik + ServersTransport + NetPol)
+
+platform:
+  vaultSecretStore:
+    kind: ClusterSecretStore
+    name: vault-ap43591
+  ingressClass: traefik
+  traefikNamespace: traefik
+  externalTLSSecret: ingress-tls
+
+externalSecrets:
+  refreshInterval: "1h"
+  gcpServiceAccountNames:
+    - synchronizer
+    - udca
+    - mart
+    - metrics
+
+commonLabels:
+  appUID: ap43591
+  app.kubernetes.io/part-of: apigee-hybrid
+  app.kubernetes.io/managed-by: argocd

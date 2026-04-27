@@ -1,0 +1,32 @@
+# values/tenants/prod-finance/values-prod-finance-virtualhost.yaml
+# ============================================================================
+# Surcharges du chart Google "apigee-virtualhost" pour prod-finance.
+# Ce chart crée l'ApigeeEnvGroup avec les routing rules et virtualhosts.
+# ============================================================================
+
+namespace: apigee
+
+org: "my-apigee-org"
+
+envgroup: "prod-finance-group"
+
+# Hostnames exposés par ce tenant
+virtualhosts:
+  - name: api-finance
+    hostnames:
+      - "api-finance.mondomaine.com"
+      - "api-finance-internal.mondomaine.com"
+    # Secret TLS de la gateway (créé par ExternalSecret)
+    sslSecret: apigee-tls-prod-finance
+
+# Environnements rattachés à cet envgroup
+routingRules:
+  - envs:
+      - "prod-finance"
+    hosts:
+      - "api-finance.mondomaine.com"
+      - "api-finance-internal.mondomaine.com"
+
+# Référence à la gateway (dedicated pour prod-finance)
+ingressGateways:
+  - name: apigee-ingress-prod-finance

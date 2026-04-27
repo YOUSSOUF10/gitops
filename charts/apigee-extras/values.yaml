@@ -1,0 +1,55 @@
+render:
+  only: all  # externalsecrets | exposure | all
+
+tenant:
+  name: ""
+  cluster: ""
+  appUID: ""
+  type: standard   # standard | infra
+
+platform:
+  vaultSecretStore:
+    kind: ClusterSecretStore
+    name: ""
+  ingressClass: traefik
+  traefikNamespace: traefik
+  externalTLSSecret: ingress-tls
+
+externalSecrets:
+  refreshInterval: "1h"
+  gcpServiceAccountNames:
+    - synchronizer
+    - udca
+    - mart
+    - metrics
+
+vault:
+  mountPath: ""
+  gcpServiceAccounts: {}
+  tls:
+    internalCert: ""
+    caBundle: ""
+
+ingressGateway:
+  mode: shared
+  tlsSecretName: ""
+
+exposition:
+  ingressClass: traefik
+  hosts: []
+  targetServiceName: ""
+  serversTransport:
+    name: ""
+    serverName: ""
+    insecureSkipVerify: false
+    rootCAsSecret: ""
+
+networkPolicies:
+  enabled: false
+  allowNamespaces: []
+
+pdb:
+  enabled: false
+  minAvailable: 1
+
+commonLabels: {}

@@ -1,23 +1,24 @@
-# values/tenants/dev/values-dev.yaml
-# Surcharges spécifiques au tenant "dev".
+# values/tenants/dev/values-dev.yaml — format chart Google "apigee-env"
+namespace: apigee
+envName: "dev"
+org: "my-apigee-org"
 
-apigee:
-  runtime:
-    # Dev : 1 replica suffit, on réduit les ressources
-    resources:
-      requests:
-        cpu: 200m
-        memory: 512Mi
-      limits:
-        memory: 1Gi
+runtime:
+  replicaCountMin: 1
+  replicaCountMax: 2
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      memory: 1Gi
 
-# Quotas et limites propres au tenant
-resourceQuota:
-  enabled: false    # en dev, pas de quota strict
+synchronizer:
+  replicaCountMin: 1
+  replicaCountMax: 1
+  serviceAccountRef: apigee-synchronizer-svc-account-dev
 
-# NetworkPolicies (le chart les génère si enabled: true)
-networkPolicies:
-  enabled: true
-  # Autorise les workloads du namespace `devtools` à appeler l'API dev
-  allowNamespaces:
-    - devtools
+udca:
+  replicaCountMin: 1
+  replicaCountMax: 1
+  serviceAccountRef: apigee-udca-svc-account-dev

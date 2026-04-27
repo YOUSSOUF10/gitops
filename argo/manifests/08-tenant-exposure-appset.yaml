@@ -1,18 +1,4 @@
-# AppSet 08 — Tenant exposure (Traefik)
-#
-# Rôle : poser l'Ingress Traefik + le ServersTransport qui exposent
-#        l'IngressGateway Apigee au monde extérieur via la plateforme.
-#
-# Convention plateforme (vu dans les schémas Traefik HTTPS-HTTPS) :
-#   - Ingress référence l'IngressClass "traefik"
-#   - Pour la PROD : HTTPS end-to-end → ServersTransport pointe vers
-#                    la CA interne qui a signé le cert du pod Apigee
-#   - Le cert externe (Traefik → client) est géré par cert-manager plateforme
-#     et injecté via le secret "ingress-tls" dans le namespace traefik
-#
-# Dernier dans l'ordre (wave 35) car c'est ce qui rend le tenant joignable
-# depuis l'extérieur.
-
+# AppSet 08 — Tenant exposure Traefik (chart LOCAL apigee-extras)
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -20,7 +6,6 @@ metadata:
 spec:
   goTemplate: true
   goTemplateOptions: ["missingkey=error"]
-
   generators:
     - matrix:
         generators:
@@ -33,13 +18,6 @@ spec:
               elements:
                 - cluster: cluster-A
                 # - cluster: cluster-B
-
-        selector:
-          matchExpressions:
-            - key: cluster
-              operator: In
-              values: ["{{`{{ .targetClusters | toJson }}`}}"]
-
   template:
     metadata:
       name: 'apigee-exposure-{{.tenant}}-{{.cluster}}'
@@ -53,14 +31,13 @@ spec:
       sources:
         - repoURL: https://gitlab.group.echonet/<appUID>/apigee-gitops.git
           targetRevision: HEAD
-          path: charts/apigee-tenant
+          path: charts/apigee-extras
           helm:
             releaseName: 'exposure-{{.tenant}}'
             ignoreMissingValueFiles: true
             valueFiles:
-              - $values/values/tenants/values-common.yaml
-              - $values/values/tenants/{{.tenant}}/values-{{.tenant}}.yaml
-              - $values/values/tenants/{{.tenant}}/clusters/values-{{.tenant}}-{{.cluster}}.yaml
+              - $values/values/tenants/extras-common.yaml
+              - $values/values/tenants/{{.tenant}}/values-{{.tenant}}-extras.yaml
             parameters:
               - name: render.only
                 value: exposure

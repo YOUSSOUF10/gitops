@@ -1,0 +1,62 @@
+# values/platform/datastore/values-common.yaml
+# ============================================================================
+# Format attendu par le chart Google "apigee-datastore" (version 1.16.x)
+# ============================================================================
+# Ce chart pose le CR ApigeeDatastore et tout ce qu'il faut pour Cassandra.
+# Pour voir tous les paramètres :
+#   helm show values oci://icr.io/<appUID>/helm-charts/apigee-datastore --version 1.16.0
+# ============================================================================
+
+namespace: apigee
+
+# ---- Cassandra ----
+cassandra:
+  hostNetwork: false
+  replicaCount: 3
+
+  image:
+    url: "gcr.io/apigee-release/hybrid/apigee-cassandra"
+
+  # Authentication
+  auth:
+    secret: apigee-cassandra-auth       # Secret K8s (via ExternalSecret depuis Vault)
+
+  # TLS intra-noeud et client
+  tls:
+    internode:
+      enabled: true
+    client:
+      enabled: true
+    # Le secret TLS Cassandra (via ExternalSecret)
+    secret: apigee-cassandra-tls
+
+  # JVM heap
+  maxHeapSize: 512M
+  heapNewSize: 100M
+
+  # Ressources par pod
+  resources:
+    requests:
+      cpu: "2"
+      memory: 4Gi
+    limits:
+      memory: 4Gi
+
+  # Storage (PVC)
+  storage:
+    storageClass: "ibmc-vpc-block-10iops-tier"
+    capacity: 500Gi
+
+  # Pod anti-affinity — 1 pod par node physique
+  antiAffinity:
+    enabled: true
+    topologyKey: kubernetes.io/hostname
+
+  # Backup vers GCS (optionnel)
+  backup:
+    enabled: false
+    # Si activé plus tard :
+    # schedule: "0 3 * * *"
+    # serviceAccountRef: apigee-cassandra-backup-sa
+    # cloudProvider: GCS
+    # dbStorageBucket: "gs://<bucket-name>"

@@ -1,0 +1,8 @@
+# values/platform/datastore/clusters/values-dc1.yaml
+# Surcharges spécifiques au DC1 (cluster-A)
+
+cassandra:
+  datacenter: "dc-1"
+  nodeSelector:
+    workload: apigee-data
+  # tolerations: []

@@ -1,0 +1,38 @@
+# values/tenants/dev/values-dev-extras.yaml
+# Pour chart local apigee-extras : ExternalSecrets + exposition Traefik
+
+tenant:
+  type: standard
+
+vault:
+  mountPath: secret/ap43591/apigee/dev
+  gcpServiceAccounts:
+    synchronizer: sa-synchronizer.json
+    udca: sa-udca.json
+    mart: sa-mart.json
+    metrics: sa-metrics.json
+  tls:
+    internalCert: tls/internal
+    caBundle: ../ca/internal-ca
+
+ingressGateway:
+  mode: shared
+  tlsSecretName: apigee-tls-infra-nonprod
+
+exposition:
+  ingressClass: traefik
+  hosts:
+    - host: api-dev.mondomaine.com
+      tlsSecretRef: ingress-tls
+  targetServiceName: apigee-ingress-nonprod
+  serversTransport:
+    name: ""
+
+networkPolicies:
+  enabled: true
+  allowNamespaces:
+    - traefik
+    - devtools
+
+pdb:
+  enabled: false

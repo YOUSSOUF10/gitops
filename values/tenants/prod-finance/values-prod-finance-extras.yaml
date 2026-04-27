@@ -1,0 +1,41 @@
+# values/tenants/prod-finance/values-prod-finance-extras.yaml
+tenant:
+  type: standard
+
+vault:
+  mountPath: secret/ap43591/apigee/prod-finance
+  gcpServiceAccounts:
+    synchronizer: sa-synchronizer.json
+    udca: sa-udca.json
+    mart: sa-mart.json
+    metrics: sa-metrics.json
+  tls:
+    internalCert: tls/internal
+    caBundle: ../ca/internal-ca
+
+ingressGateway:
+  mode: dedicated
+  tlsSecretName: apigee-tls-prod-finance
+
+exposition:
+  ingressClass: traefik
+  hosts:
+    - host: api-finance.mondomaine.com
+      tlsSecretRef: ingress-tls
+    - host: api-finance-internal.mondomaine.com
+      tlsSecretRef: ingress-tls
+  targetServiceName: apigee-ingress-prod-finance
+  serversTransport:
+    name: apigee-transport-prod-finance
+    serverName: apigee-ingress-prod-finance.apigee.svc
+    insecureSkipVerify: false
+    rootCAsSecret: apigee-ca-trust
+
+networkPolicies:
+  enabled: true
+  allowNamespaces:
+    - traefik
+
+pdb:
+  enabled: true
+  minAvailable: 2

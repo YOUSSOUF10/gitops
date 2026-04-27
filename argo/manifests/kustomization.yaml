@@ -1,14 +1,12 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Ordre de chargement logique — les sync-waves ArgoCD
-# sur chaque ressource gèrent l'ordre effectif de réconciliation.
 resources:
-  - 01-ns-appset.yaml
-  - 02-platform-crds-appset.yaml
-  - 03-platform-controller-appset.yaml
-  - 04-cassandra-app.yaml
-  - 05-tenant-secrets-appset.yaml
-  - 06-tenant-ingress-appset.yaml
-  - 07-tenant-env-appset.yaml
-  - 08-tenant-exposure-appset.yaml
+  - 01-ns-appset.yaml                  # inchangé (namespace)
+  - 02-apigee-operator-appset.yaml     # NOUVEAU : chart Google apigee-operator
+  - 03-apigee-org-appset.yaml          # NOUVEAU : chart Google apigee-org + telemetry
+  - 04-cassandra-app.yaml              # RÉÉCRIT : chart Google apigee-datastore
+  - 05-tenant-secrets-appset.yaml      # inchangé (ExternalSecrets, chart local)
+  - 06-tenant-ingress-appset.yaml      # RÉÉCRIT : chart Google apigee-ingress-manager
+  - 07-tenant-env-appset.yaml          # RÉÉCRIT : charts Google apigee-env + virtualhost
+  - 08-tenant-exposure-appset.yaml     # inchangé (Ingress Traefik, chart local)

@@ -1,0 +1,31 @@
+# values/platform/ingressmanager/values-common.yaml
+# ============================================================================
+# Format attendu par le chart Google "apigee-ingress-manager"
+# ============================================================================
+# Ce chart crée l'ApigeeIngressGateway.
+# Les valeurs de ce fichier sont les DÉFAULTS — les surcharges par tenant
+# sont dans values/tenants/<tenant>/values-<tenant>-ingress.yaml
+# ============================================================================
+
+namespace: apigee
+
+# Valeurs par défaut de la gateway — surchargées par tenant
+ingressGateway:
+  image:
+    url: "gcr.io/apigee-release/hybrid/apigee-asm-ingress"
+
+  replicaCountMin: 2
+  replicaCountMax: 4
+
+  svcType: ClusterIP         # pas de LoadBalancer, Route OCP gérée par l'équipe réseau
+
+  resources:
+    requests:
+      cpu: 300m
+      memory: 512Mi
+    limits:
+      memory: 1Gi
+
+  # Le Secret TLS de la gateway, fourni par ExternalSecret depuis Vault.
+  # Nom surchargé par tenant dans values-<tenant>-ingress.yaml
+  svcLoadBalancerIP: ""

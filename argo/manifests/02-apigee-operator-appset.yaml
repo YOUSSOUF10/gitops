@@ -1,0 +1,64 @@
+# AppSet 02 — Apigee Operator (CRDs + controller)
+#
+# Consomme le chart OFFICIEL Google "apigee-operator" depuis le registry OCI.
+# Ce chart pose À LA FOIS les CRDs et le controller — on ne peut pas les
+# séparer en deux (contrairement à notre ancien wrapper).
+#
+# Impact : les waves 5 (CRDs) et 10 (controller) fusionnent en wave 5.
+# Le controller démarre après les CRDs car le chart Google gère l'ordre
+# en interne (hooks Helm + readiness probes).
+#
+# Version Apigee Hybrid : 1.16.x — targetRevision à bumper à chaque upgrade.
+
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: apigee-operator-appset
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+
+  generators:
+    - list:
+        elements:
+          - cluster: cluster-A
+          # - cluster: cluster-B
+
+  template:
+    metadata:
+      name: 'apigee-operator-{{.cluster}}'
+      annotations:
+        argocd.argoproj.io/sync-wave: "5"
+    spec:
+      project: default
+      destination:
+        name: '{{.cluster}}'
+        namespace: apigee
+      sources:
+        # SOURCE 1 : chart Google depuis le registry OCI interne
+        - repoURL: oci://icr.io/<appUID>/helm-charts
+          chart: apigee-operator
+          targetRevision: 1.16.0
+          helm:
+            releaseName: apigee-operator
+            ignoreMissingValueFiles: true
+            valueFiles:
+              - $values/values/platform/operator/values-common.yaml
+              - $values/values/platform/operator/clusters/values-{{.cluster}}.yaml
+        # SOURCE 2 : ton repo Git, pour les values uniquement
+        - repoURL: https://gitlab.group.echonet/<appUID>/apigee-gitops.git
+          targetRevision: HEAD
+          ref: values
+      syncPolicy:
+        automated:
+          prune: false       # JAMAIS prune les CRDs ni le controller
+          selfHeal: true
+        syncOptions:
+          - ServerSideApply=true
+          - Replace=true
+          - RespectIgnoreDifferences=true
+      ignoreDifferences:
+        - group: apiextensions.k8s.io
+          kind: CustomResourceDefinition
+          jsonPointers:
+            - /spec/conversion/webhook/clientConfig/caBundle
