@@ -1,0 +1,45 @@
+stages:
+  - build
+  - push-jfrog
+
+containers:build:apigee-hybrid:
+  stage: build
+  # ... inchangé, strategy:depend attend la fin du child complet ...
+
+push-apigee-images-to-jfrog:
+  stage: push-jfrog
+  needs:
+    - job: containers:build:apigee-hybrid
+      artifacts: false
+  image: private.fr2.icr.io/ap88257-hprd/gitlab-ci-image:3.6.1
+  variables:
+    ICR_REGISTRY: "private.fr2.icr.io/ap88257-hprd"
+    JFROG_LOCAL: "p-1408-docker-local.artifactory-dogen.group.echonet"
+  parallel:
+    matrix:
+      - IMAGE_NAME: apigee-release/hybrid/apigee-mart-server
+      - IMAGE_NAME: apigee-release/hybrid/apigee-synchronizer
+      - IMAGE_NAME: apigee-release/hybrid/apigee-runtime
+      - IMAGE_NAME: apigee-release/hybrid/apigee-hybrid-cassandra-client
+      - IMAGE_NAME: apigee-release/hybrid/apigee-hybrid-cassandra
+      - IMAGE_NAME: apigee-release/hybrid/apigee-connect-agent
+      - IMAGE_NAME: apigee-release/hybrid/apigee-watcher
+  script:
+    - |
+      echo "=== Auth IBM ICR (source post-scan) ==="
+      crane auth login "${ICR_REGISTRY}" \
+        -u "${IBM_DOCKER_REGISTRY_USERNAME}" \
+        -p "${IBM_PASSWORD}"
+
+      echo "=== Auth JFrog local (target) ==="
+      crane auth login "${JFROG_LOCAL}" \
+        -u "${ARTIFACTORY_JFROG_USERNAME}" \
+        -p "${ARTIFACTORY_JFROG_PASSWORD}"
+
+      SOURCE="${ICR_REGISTRY}/${IMAGE_NAME}:${APIGEE_VERSION}"
+      TARGET="${JFROG_LOCAL}/${IMAGE_NAME}:${APIGEE_VERSION}"
+
+      echo "FROM: ${SOURCE}"
+      echo "TO  : ${TARGET}"
+
+      crane copy "${SOURCE}" "${TARGET}"
