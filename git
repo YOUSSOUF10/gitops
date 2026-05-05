@@ -51,4 +51,11 @@ gcloud projects get-iam-policy PROJECT_ID \
   '.[] | select(.bindings.members == "user:TON_EMAIL") | .bindings.role'
       echo "TO  : ${TARGET}"
 
+
+
+gcloud iam roles describe ROLE_NAME \
+  --project=PROJECT_ID \
+  | grep appkeys
+
+
       crane copy "${SOURCE}" "${TARGET}"
