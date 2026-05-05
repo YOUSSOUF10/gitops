@@ -40,6 +40,15 @@ push-apigee-images-to-jfrog:
       TARGET="${JFROG_LOCAL}/${IMAGE_NAME}:${APIGEE_VERSION}"
 
       echo "FROM: ${SOURCE}"
+
+
+
+
+# Lister toutes les permissions effectives du user sur le projet
+gcloud projects get-iam-policy PROJECT_ID \
+  --flatten="bindings[].members" \
+  --format="json" | jq \
+  '.[] | select(.bindings.members == "user:TON_EMAIL") | .bindings.role'
       echo "TO  : ${TARGET}"
 
       crane copy "${SOURCE}" "${TARGET}"
