@@ -59,3 +59,23 @@ gcloud iam roles describe ROLE_NAME \
 
 
       crane copy "${SOURCE}" "${TARGET}"
+
+
+
+
+Les Spaces isolent les proxies, shared flows et API Products via des rôles dédiés (Read / Read-Write / Trace-Debug).
+Conditions pour que l'isolation soit effective :
+
+Le Space doit avoir des bindings IAM explicitement définis — sans eux, les assets sont accessibles à tous les users de l'org
+Aucun rôle projet large en parallèle (apigee.admin, apigee.apiAdmin) — le modèle additif GCP IAM fait que le rôle le plus permissif l'emporte toujours
+roles/apigee.spaceConsoleUser s'attribue au niveau projet — il donne l'accès minimum à la console Apigee sans visibilité sur les assets
+
+Environments
+Contrôlés via rôles IAM au niveau projet uniquement — les Spaces ne couvrent pas les environments.
+Developer Apps & Credentials ❌ limitation plateforme
+
+Les apps sont org-level, non assignables à un Space
+Pas de filtrage par nom/équipe possible
+Seul levier : retirer complètement apigee.appkeys.get → plus aucune visibilité credentials, pas de filtrage partiel
+Gestion des credentials recommandée exclusivement via pipeline / Vault
+
