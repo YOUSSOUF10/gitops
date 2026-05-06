@@ -63,19 +63,122 @@ gcloud iam roles describe ROLE_NAME \
 
 
 
-Les Spaces isolent les proxies, shared flows et API Products via des rôles dédiés (Read / Read-Write / Trace-Debug).
-Conditions pour que l'isolation soit effective :
+---
+include:
+  - project: "market-place/ap43591/gitlab-templates"
+    ref: &ref main
+    file:
+      - /integration/default.yml
+      - /deployment/helm.yml
+      - /pipelines/workflow.yml
 
-Le Space doit avoir des bindings IAM explicitement définis — sans eux, les assets sont accessibles à tous les users de l'org
-Aucun rôle projet large en parallèle (apigee.admin, apigee.apiAdmin) — le modèle additif GCP IAM fait que le rôle le plus permissif l'emporte toujours
-roles/apigee.spaceConsoleUser s'attribue au niveau projet — il donne l'accès minimum à la console Apigee sans visibilité sur les assets
+variables:
+  APIGEE_VERSION:
+    value: "1.16.0-hotfix.1"
+    description: "version des images apigee hybrid"
 
-Environments
-Contrôlés via rôles IAM au niveau projet uniquement — les Spaces ne couvrent pas les environments.
-Developer Apps & Credentials ❌ limitation plateforme
+stages:
+  - build
+  - push-jfrog
 
-Les apps sont org-level, non assignables à un Space
-Pas de filtrage par nom/équipe possible
-Seul levier : retirer complètement apigee.appkeys.get → plus aucune visibilité credentials, pas de filtrage partiel
-Gestion des credentials recommandée exclusivement via pipeline / Vault
+containers:build:apigee-hybrid:
+  stage: build
+  inherit:
+    variables: true
+  variables:
+    ARTIFACTORY_DOCKER_HOSTNAME: "shared-docker-1-gcr-io.artifactory-dogen.group.echonet"
+    REMOTE_IMAGE_REGISTRY: "shared-docker-1-gcr-io.artifactory-dogen.group.echonet"
+  trigger:
+    strategy: depend
+    include:
+      - project: market-place/ap43591/gitlab-templates
+        ref: *ref
+        file: /pipelines/containers-remote-get.yml
+  parallel:
+    matrix:
+      - REMOTE_IMAGE_PATH: apigee-release/hybrid/apigee-mart-server
+        REMOTE_IMAGE_TAG: $APIGEE_VERSION
+        IMAGE_NAME: apigee-release/hybrid/apigee-mart-server
+        IMAGE_TAG: $APIGEE_VERSION
+      - REMOTE_IMAGE_PATH: apigee-release/hybrid/apigee-synchronizer
+        REMOTE_IMAGE_TAG: $APIGEE_VERSION
+        IMAGE_NAME: apigee-release/hybrid/apigee-synchronizer
+        IMAGE_TAG: $APIGEE_VERSION
+      - REMOTE_IMAGE_PATH: apigee-release/hybrid/apigee-runtime
+        REMOTE_IMAGE_TAG: $APIGEE_VERSION
+        IMAGE_NAME: apigee-release/hybrid/apigee-runtime
+        IMAGE_TAG: $APIGEE_VERSION
+      - REMOTE_IMAGE_PATH: apigee-release/hybrid/apigee-hybrid-cassandra-client
+        REMOTE_IMAGE_TAG: $APIGEE_VERSION
+        IMAGE_NAME: apigee-release/hybrid/apigee-hybrid-cassandra-client
+        IMAGE_TAG: $APIGEE_VERSION
+      - REMOTE_IMAGE_PATH: apigee-release/hybrid/apigee-hybrid-cassandra
+        REMOTE_IMAGE_TAG: $APIGEE_VERSION
+        IMAGE_NAME: apigee-release/hybrid/apigee-hybrid-cassandra
+        IMAGE_TAG: $APIGEE_VERSION
+      - REMOTE_IMAGE_PATH: apigee-release/hybrid/apigee-connect-agent
+        REMOTE_IMAGE_TAG: $APIGEE_VERSION
+        IMAGE_NAME: apigee-release/hybrid/apigee-connect-agent
+        IMAGE_TAG: $APIGEE_VERSION
+      - REMOTE_IMAGE_PATH: apigee-release/hybrid/apigee-watcher
+        REMOTE_IMAGE_TAG: $APIGEE_VERSION
+        IMAGE_NAME: apigee-release/hybrid/apigee-watcher
+        IMAGE_TAG: $APIGEE_VERSION
 
+push-apigee-images-to-jfrog:
+  stage: push-jfrog
+  needs:
+    - job: containers:build:apigee-hybrid
+      artifacts: false
+  image: private.fr2.icr.io/ap88257-hprd/gitlab-ci-image:3.6.1
+  variables:
+    VAULT_PATH: "ap24182-datalab-itgp/ibmcloud/20017a145d1345aebabed8efb32acada/rg-ap88257/icr-ro-account"
+    JFROG_LOCAL: "p-1408-docker-local.artifactory-dogen.group.echonet"
+    ICR_NAMESPACE: "ap88257-hprd"
+  parallel:
+    matrix:
+      - IMAGE_NAME: apigee-release/hybrid/apigee-mart-server
+      - IMAGE_NAME: apigee-release/hybrid/apigee-synchronizer
+      - IMAGE_NAME: apigee-release/hybrid/apigee-runtime
+      - IMAGE_NAME: apigee-release/hybrid/apigee-hybrid-cassandra-client
+      - IMAGE_NAME: apigee-release/hybrid/apigee-hybrid-cassandra
+      - IMAGE_NAME: apigee-release/hybrid/apigee-connect-agent
+      - IMAGE_NAME: apigee-release/hybrid/apigee-watcher
+  script:
+    - |
+      echo "=== Récupération credentials ICR depuis Vault ==="
+      ICR_USERNAME=$(vault kv get \
+        -namespace=ap88257 \
+        -field=username \
+        "${VAULT_PATH}")
+
+      ICR_PASSWORD=$(vault kv get \
+        -namespace=ap88257 \
+        -field=password \
+        "${VAULT_PATH}")
+
+      ICR_URL=$(vault kv get \
+        -namespace=ap88257 \
+        -field=url \
+        "${VAULT_PATH}")
+
+      echo "=== Auth IBM ICR (source post-scan) ==="
+      crane auth login "${ICR_URL}" \
+        -u "${ICR_USERNAME}" \
+        -p "${ICR_PASSWORD}"
+
+      echo "=== Auth JFrog local (target) ==="
+      crane auth login "${JFROG_LOCAL}" \
+        -u "${ARTIFACTORY_JFROG_USERNAME}" \
+        -p "${ARTIFACTORY_JFROG_PASSWORD}"
+
+      SOURCE="${ICR_URL}/${ICR_NAMESPACE}/${IMAGE_NAME}:${APIGEE_VERSION}"
+      TARGET="${JFROG_LOCAL}/${IMAGE_NAME}:${APIGEE_VERSION}"
+
+      echo "=== Copy image post-scan ==="
+      echo "FROM : ${SOURCE}"
+      echo "TO   : ${TARGET}"
+
+      crane copy "${SOURCE}" "${TARGET}"
+
+      echo "=== Done: ${IMAGE_NAME}:${APIGEE_VERSION} pushed to JFrog ==="
