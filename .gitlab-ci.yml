@@ -176,3 +176,77 @@ argocd:kustomize-check:
     - grep -c "kind: ApplicationSet" /tmp/argo-rendered.yaml
     # Doit afficher 7 (nombre d'AppSets dans kustomization.yaml + 1 App Cassandra)
   allow_failure: true
+
+
+
+
+
+include:
+  - project: "market-place/ap43591/gitlab-templates"
+    ref: &ref main
+    file:
+      - /integration/default.yml
+      - /deployment/helm.yml
+      - /pipelines/workflow.yml
+
+stages:
+  - build
+  - promote
+
+containers:build:clickhouse:
+  stage: build
+  inherit:
+    variables: true
+  variables:
+    ARTIFACTORY_DOCKER_HOSTNAME: "shared-docker-1-gcr-io.artifactory-dogen.group.echonet"
+    REMOTE_IMAGE_REGISTRY: "shared-docker-1-gcr-io.artifactory-dogen.group.echonet"
+  trigger:
+    strategy: depend
+    include:
+      - project: market-place/ap43591/gitlab-templates
+        ref: *ref
+        file: /pipelines/containers-remote-get.yml
+  parallel:
+    matrix:
+      - REMOTE_IMAGE_PATH: "apigee-release/hybrid/apigee-mart-server"
+        REMOTE_IMAGE_TAG: "1.14.2-hotfix.1"
+        IMAGE_NAME: "apigee-release/hybrid/apigee-mart-server"
+        IMAGE_TAG: "1.14.2-hotfix.1"
+
+promote:one-image-to-artifactory:
+  stage: promote
+  image:
+    name: quay.io/skopeo/stable:latest
+    entrypoint: [""]
+  needs:
+    - job: containers:build:clickhouse
+      optional: true
+  variables:
+    IMAGE: "apigee-release/hybrid/apigee-mart-server:1.14.2-hotfix.1"
+    ARTIFACTORY_REGISTRY: "shared-docker-1-gcr-io.artifactory-dogen.group.echonet"
+  secrets:
+    IBM_REGISTRY_USERNAME:
+      vault: ap24182-datalab-itqp/ibmcloud/20017a145d1345aebabed8efb32acada/rg-ap88257/icr-ro-account/username@kv
+      file: false
+    IBM_REGISTRY_PASSWORD:
+      vault: ap24182-datalab-itqp/ibmcloud/20017a145d1345aebabed8efb32acada/rg-ap88257/icr-ro-account/password@kv
+      file: false
+    IBM_REGISTRY_URL:
+      vault: ap24182-datalab-itqp/ibmcloud/20017a145d1345aebabed8efb32acada/rg-ap88257/icr-ro-account/url@kv
+      file: false
+  before_script:
+    - echo "$IBM_REGISTRY_PASSWORD" | skopeo login "$IBM_REGISTRY_URL" -u "$IBM_REGISTRY_USERNAME" --password-stdin
+    - echo "$ARTIFACTORY_PASSWORD" | skopeo login "$ARTIFACTORY_REGISTRY" -u "$ARTIFACTORY_USERNAME" --password-stdin
+  script:
+    - SRC="docker://${IBM_REGISTRY_URL}/${IMAGE}"
+    - DST="docker://${ARTIFACTORY_REGISTRY}/${IMAGE}"
+    - echo "$SRC -> $DST"
+    - skopeo copy --all "$SRC" "$DST"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+
+
+
+
+  
