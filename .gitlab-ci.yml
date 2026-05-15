@@ -250,51 +250,38 @@ promote:one-image-to-artifactory:
 
 
 
-
-
-
-    promote:one-image-to-artifactory:
+promote:one-image-to-artifactory:
   stage: promote
-  image:
-    name: quay.io/skopeo/stable:latest
-    entrypoint: [""]
-  id_tokens:
-    VAULT_ID_TOKEN:
-      aud: https://vault-oud.echonet.net.intra
+  image: docker:27
+  services:
+    - docker:27-dind
+
   variables:
-    VAULT_ADDR: "https://vault-oud.echonet.net.intra"
-    VAULT_ROLE: "apigee-hybrid-image-ci"
+    DOCKER_TLS_CERTDIR: ""
     IMAGE: "apigee-release/hybrid/apigee-mart-server:1.14.2-hotfix.1"
     ARTIFACTORY_REGISTRY: "shared-docker-1-gcr-io.artifactory-dogen.group.echonet"
+
   before_script:
-    - apk add --no-cache curl jq
-    - |
-      VAULT_TOKEN="$(curl -s \
-        --request POST \
-        --data "{\"jwt\":\"$VAULT_ID_TOKEN\",\"role\":\"$VAULT_ROLE\"}" \
-        "$VAULT_ADDR/v1/auth/jwt/login" | jq -r '.auth.client_token')"
+    - docker login "$IBM_REGISTRY_URL" \
+        -u "$IBM_REGISTRY_USERNAME" \
+        -p "$IBM_REGISTRY_PASSWORD"
 
-    - |
-      IBM_SECRET="$(curl -s \
-        -H "X-Vault-Token: $VAULT_TOKEN" \
-        "$VAULT_ADDR/v1/products/data/ap24182-datalab-itqp/ibmcloud/20017a145d1345aebabed8efb32acada/rg-ap88257/icr-ro-account")"
+    - docker login "$ARTIFACTORY_REGISTRY" \
+        -u "$ARTIFACTORY_USERNAME" \
+        -p "$ARTIFACTORY_PASSWORD"
 
-    - export IBM_REGISTRY_USERNAME="$(echo "$IBM_SECRET" | jq -r '.data.data.username')"
-    - export IBM_REGISTRY_PASSWORD="$(echo "$IBM_SECRET" | jq -r '.data.data.password')"
-    - export IBM_REGISTRY_URL="$(echo "$IBM_SECRET" | jq -r '.data.data.url')"
-
-    - echo "$IBM_REGISTRY_PASSWORD" | skopeo login "$IBM_REGISTRY_URL" -u "$IBM_REGISTRY_USERNAME" --password-stdin
-    - echo "$ARTIFACTORY_PASSWORD" | skopeo login "$ARTIFACTORY_REGISTRY" -u "$ARTIFACTORY_USERNAME" --password-stdin
   script:
-    - SRC="docker://${IBM_REGISTRY_URL}/${IMAGE}"
-    - DST="docker://${ARTIFACTORY_REGISTRY}/${IMAGE}"
+    - SRC="$IBM_REGISTRY_URL/$IMAGE"
+    - DST="$ARTIFACTORY_REGISTRY/$IMAGE"
+
     - echo "$SRC -> $DST"
-    - skopeo copy --all "$SRC" "$DST"
+
+    - docker pull "$SRC"
+    - docker tag "$SRC" "$DST"
+    - docker push "$DST"
+
   rules:
     - when: always
-
-
-
 
 
   
