@@ -249,7 +249,6 @@ promote:one-image-to-artifactory:
 
 
 
-
 promote:image-to-artifactory:
   stage: promote
   image: private.fr2.icr.io/ap43591-prod/gitlab-ci-image:3.6.3
@@ -257,25 +256,21 @@ promote:image-to-artifactory:
   variables:
     IBM_REGISTRY: "private.fr2.icr.io"
     IBM_NAMESPACE: "ap88257-hprd"
+
     ARTIFACTORY_REGISTRY: "shared-docker-1-gcr-io.artifactory-dogen.group.echonet"
+
     IMAGE: "apigee-release/hybrid/apigee-mart-server:1.14.2-hotfix.1"
 
   script:
-    - bnp_code_ap
-    - vault_dynamic_secrets
-    - artifactory_init
-
-    # Login IBM ICR
     - echo "$ICR_PASSWORD" | crane auth login "$IBM_REGISTRY" -u "$ICR_USERNAME" --password-stdin
 
-    # Login Artifactory
     - echo "$ARTIFACTORY_PASSWORD" | crane auth login "$ARTIFACTORY_REGISTRY" -u "$ARTIFACTORY_USERNAME" --password-stdin
 
-    # Copy IBM ICR -> Artifactory
     - SRC="${IBM_REGISTRY}/${IBM_NAMESPACE}/${IMAGE}"
     - DST="${ARTIFACTORY_REGISTRY}/${IMAGE}"
 
     - echo "COPY $SRC -> $DST"
+
     - crane copy "$SRC" "$DST"
 
   rules:
