@@ -43,3 +43,50 @@ ExternalSecrets, Ingress Traefik, ServersTransport, NetworkPolicies, PDB.
 ## Démarrage
 
 Voir `docs/argocd-bootstrap.md`
+
+
+
+
+
+
+Hello Team,
+
+As preparation for the Apigee Hybrid onboarding, we would like to share the current setup direction before moving forward with the implementation phase.
+
+Current proposal:
+
+* Project ID: `apigee-plg-dev`
+* Apigee organization name: `apigee-plg-dev`
+* Runtime type: `HYBRID`
+* Billing type: `SUBSCRIPTION`
+
+For the API consumer analytics and data residency location, we are considering:
+
+* `europe-central2` (Warsaw)
+
+The objective is to keep analytics and API consumer-related data hosted as close as possible to the Poland region while aligning with European residency requirements.
+
+For the Apigee endpoint, we are considering:
+
+* `https://eu-apigee.googleapis.com/v1/`
+
+The objective is to leverage the European multi-region endpoint strategy for better regional alignment, resiliency, and API management access within the EU scope.
+
+For the first phase, we propose starting with a single Apigee organization.
+Once the initial onboarding and governance model are validated, we can later evaluate onboarding an additional organization if required.
+
+Before starting the WebSSO onboarding, we will also need:
+
+* authorized email domain(s)
+* initial user list
+* expected roles/access levels
+
+  * Viewer
+  * Developer
+  * Admin
+* confirmation of the corporate IdP used for SSO
+
+This message is mainly intended to share the current onboarding direction and collect the required access information before provisioning activities begin.
+
+Best regards,
+Youssouf
