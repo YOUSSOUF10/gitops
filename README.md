@@ -47,7 +47,7 @@ Voir `docs/argocd-bootstrap.md`
 
 
 
-
+Apigee Organization Provisioning – Initial Setup Direction
 
 Hello Team,
 
@@ -86,7 +86,11 @@ Before starting the WebSSO onboarding, we will also need:
   * Admin
 * confirmation of the corporate IdP used for SSO
 
-This message is mainly intended to share the current onboarding direction and collect the required access information before provisioning activities begin.
+After the organization provisioning is completed, we will come back to you with all the requirements needed for the runtime plane deployment.
+
+Please note that organization provisioning is not reversible once completed.
+For this reason, we kindly ask to ensure that all prerequisites, validations, naming conventions, and residency requirements are fully confirmed before starting the provisioning process.
 
 Best regards,
 Youssouf
+
