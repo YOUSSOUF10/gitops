@@ -494,3 +494,38 @@ Ce repo ne gère que le Management Plane (GCP). Le déploiement du Runtime Plane
 - [Repo environments & environment groups](../002-Terraform-Envgroups/README.md) *(lien relatif — à adapter)*
 - [Repo ArgoCD / Runtime Plane](../003-ArgoCD-Runtime/README.md) *(lien relatif — à adapter)*
 
+
+
+Hello Team,
+
+Thank you for your response and for the detailed feedback.
+
+Regarding the organization provisioning, we are in the data residency scenario.
+
+For the billing model, we are using SUBSCRIPTION, as defined in our contract with Google Cloud.
+
+Regarding the service accounts, we can provide the required IAM permissions to allow the creation of the service accounts needed for the Apigee Hybrid runtime deployment.
+
+Google supports different service account strategies for Apigee Hybrid:
+
+Dedicated service accounts per component (runtime, synchronizer, connect agent, metrics, etc.), providing stronger separation of duties and least-privilege access.
+Shared service account model, where a single service account is used across multiple components, simplifying administration and maintenance.
+
+We would like to leave the choice of the service account strategy to your team based on your security and operational requirements.
+
+Google provides tooling and scripts to generate the required service accounts during the installation process. In particular, the apigee-operator tooling can be used to automate the creation and configuration of the service accounts required by the runtime plane.
+
+For reference, please find the relevant Google documentation below:
+
+Service Accounts for Apigee Hybrid:
+https://cloud.google.com/apigee/docs/hybrid/latest/sa-about
+Configure Service Account Authentication:
+https://cloud.google.com/apigee/docs/hybrid/latest/install-sa-authentication
+Apigee Hybrid Installation Overview:
+https://cloud.google.com/apigee/docs/hybrid/latest/install-overview
+
+Once the organization provisioning is completed, we will come back to you with the detailed runtime plane deployment requirements and align on the selected service account strategy.
+
+Best regards,
+Youssouf
+
