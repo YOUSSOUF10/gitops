@@ -504,18 +504,33 @@ Regarding the organization provisioning, we are in the data residency scenario.
 
 For the billing model, we are using SUBSCRIPTION, as defined in our contract with Google Cloud.
 
-Regarding the service accounts, we can provide the required IAM permissions to allow the creation of the service accounts needed for the Apigee Hybrid runtime deployment.
+The proposed configuration is therefore:
+
+Project ID: apigee-plg-dev
+Apigee organization name: apigee-plg-dev
+Runtime type: HYBRID
+Control Plane Location: eu
+Consumer Data Region: europe-central2 (Warsaw)
+Billing Type: SUBSCRIPTION
+
+The objective of selecting europe-central2 is to keep analytics and API consumer-related data hosted as close as possible to the Poland region while aligning with European data residency requirements.
+
+The eu-apigee.googleapis.com endpoint is intended to leverage the European multi-region control plane, providing regional alignment, resiliency, and API management access within the EU scope.
+
+Regarding the service accounts, our recommendation is not to create them manually one by one from the GCP Console.
+
+Our team can provide the required IAM permissions and prerequisites on the GCP project, but the service accounts should preferably be generated using the official Apigee Hybrid tooling and scripts provided by Google.
 
 Google supports different service account strategies for Apigee Hybrid:
 
-Dedicated service accounts per component (runtime, synchronizer, connect agent, metrics, etc.), providing stronger separation of duties and least-privilege access.
+Dedicated service accounts per component (runtime, synchronizer, connect agent, metrics, mart, etc.), providing stronger separation of duties and least-privilege access.
 Shared service account model, where a single service account is used across multiple components, simplifying administration and maintenance.
 
 We would like to leave the choice of the service account strategy to your team based on your security and operational requirements.
 
-Google provides tooling and scripts to generate the required service accounts during the installation process. In particular, the apigee-operator tooling can be used to automate the creation and configuration of the service accounts required by the runtime plane.
+Google provides tooling and scripts to automate the creation of the required service accounts during the installation process. This approach ensures consistency and helps avoid configuration errors.
 
-For reference, please find the relevant Google documentation below:
+For reference, please find the relevant documentation below:
 
 Service Accounts for Apigee Hybrid:
 https://cloud.google.com/apigee/docs/hybrid/latest/sa-about
@@ -524,8 +539,11 @@ https://cloud.google.com/apigee/docs/hybrid/latest/install-sa-authentication
 Apigee Hybrid Installation Overview:
 https://cloud.google.com/apigee/docs/hybrid/latest/install-overview
 
-Once the organization provisioning is completed, we will come back to you with the detailed runtime plane deployment requirements and align on the selected service account strategy.
+After the organization provisioning is completed, we will come back to you with all the requirements needed for the runtime plane deployment.
+
+Please note that organization provisioning is not reversible once completed. Therefore, we kindly ask that all prerequisites, validations, naming conventions, and residency requirements be fully confirmed before starting the provisioning process.
 
 Best regards,
-Youssouf
+
+Youssouf Ziane
 
